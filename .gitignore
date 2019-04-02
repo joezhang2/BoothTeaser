@@ -1,0 +1,10 @@
+.idea
+node_modules
+coverage
+atlassian-ide-plugin.xml
+*.log
+checkstyle.xml
+clover.xml
+npm-debug.log
+package-lock.json
+dist
