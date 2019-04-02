@@ -1,16 +1,15 @@
 {
-  "name": "booth-teaser",
+  "name": "goto-booth",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
-  "directories": {
-    "doc": "docs"
-  },
   "scripts": {
+    "serve": "node server.js",
+    "start": "npm run serve",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.16.4"
   }
