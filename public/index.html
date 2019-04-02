@@ -13,11 +13,10 @@
     <script src="//cdn.rawgit.com/mrdoob/three.js/master/build/three.min.js"></script>
     <script src="letters.js"></script>
 	
-    <div style="position:absolute; top:0;left:0;right:350px;bottom:0; background-color:rgba(0,0,50,0.3);">
+    <div id="left-div" style="position:absolute; top:0;left:0;right:350px;bottom:0; background-color:rgba(0,0,50,0.3);">
         This is on the left 
         <div style="position: relative" class="margin">
             <video style="position:absolute; top:0;right:0;bottom:0; width:1px;height: 1px;" onplay="onPlay(this)" id="inputVideo" autoplay muted></video>
-            <canvas id="overlay" />
         </div>
     </div>
 	<div style="position:absolute; top:0;right:0;bottom:0; width:350px; background-color:rgba(50,0,0,0.5);">This is an image of a dude</div>
