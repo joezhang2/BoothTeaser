@@ -30,7 +30,9 @@ function init() {
 	
 	var aspect = window.innerWidth / window.innerHeight;
 	scene = new THREE.Scene();
-	
+
+	scene.matrixAutoUpdate = false;
+
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
 	camera = new THREE.PerspectiveCamera(30, aspect, 0.01, 200);
 
@@ -87,6 +89,8 @@ function init() {
 	});
 	
 	renderer.setSize(window.innerWidth, window.innerHeight);
+
+	scene.updateMatrix();
 
 	document.body.appendChild(renderer.domElement);
 	
@@ -156,8 +160,8 @@ function render () {
 
 function animate() {
 	requestAnimationFrame(animate);
-//	scene.autoUpdate = false;
 	render();
+//	setTimeout(render, 0);
 }
 
 function perc2color(perc, min, max) {
@@ -369,8 +373,8 @@ function angleLetter(pos) {
 };
 
 
-function createMaterial (perc) {
-	var color = new THREE.Color(perc2color(perc, 0, 100)); //0x006600;
+function createMaterial (color) {
+	var color = new THREE.Color(color); //0x006600;
 	// console.log(perc, color);
 	return new THREE.MeshBasicMaterial({
 		color: color,
@@ -408,9 +412,9 @@ function drawLetters(scene) {
 		console.log('Total count of letters:', points.length);
 		var midway = maxWidth/2 + xPosition;
 
-		var leftMat = createMaterial(0),
-			centerMat = createMaterial(50),
-			rightMat = createMaterial(100);
+		var leftMat = createMaterial(0xFF6600),
+			centerMat = createMaterial(0x999999),
+			rightMat = createMaterial(0x0066FF);
 
 		// noinspection BadExpressionStatementJS
 
@@ -428,8 +432,9 @@ function drawLetters(scene) {
 
 		points.forEach((pos) => {
 			let curMesh;
-			if (pos.x > midway){
+			if (pos.x < midway){
 				curMesh = leftMat;
+			} else if (pos.x < midway) {
 			} else {
 				curMesh = rightMat;
 			}
