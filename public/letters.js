@@ -376,12 +376,19 @@ function angleLetter(pos) {
 function createMaterial (color) {
 	var color = new THREE.Color(color); //0x006600;
 	// console.log(perc, color);
-	return new THREE.MeshBasicMaterial({
-		color: color,
-		transparent: true,
-		opacity: 0.6 //Math.round(minMaxRand(0.3, 1) * 10).toFixed(2) 
-		// ,side: THREE.DoubleSide
-	});
+    return new THREE.ShaderMaterial({
+        uniforms: {
+            color: { type: 'v3', value: new THREE.Color(color) }
+        },
+        vertexShader: 'attribute vec3 vert;\n'
+                + 'void main() {\n'
+                + '  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n'
+                + '}',
+        fragmentShader: 'uniform vec3 color;\n'
+                + 'void main() {\n'
+                + '  gl_FragColor = vec4(color,1);\n'
+                + '}'
+    });
 }
 
 
