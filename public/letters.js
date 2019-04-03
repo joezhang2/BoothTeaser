@@ -46,7 +46,7 @@ function init() {
 	scene.fog = new THREE.Fog(fogColor, 50, 175);
 */	
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-	camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 175);
+	camera = new THREE.PerspectiveCamera(70, aspect, 10, 50);
 	
 	
 	//  scene.add(helper);
@@ -400,16 +400,16 @@ function drawLetters(scene) {
 		// var density = .3;
 		// var points = generateCylinder(centerPoint, edgePoint, density, height, heightIncrements);
 		
-		var xPosition = -20;
-		var maxWidth = 30;
-		var numWidthIncrement = 15;
-		var maxRadius = 47;
-		var minRadius = 46;
-		var numRadiusIncrements = .2
-		var xMid;
+		var xPosition = -45; // 20
+		var maxWidth = 90; // 30
+		var numWidthIncrement = 40; // 15
+		var maxRadius = 50; // 47
+		var minRadius = 30; // 46
+		var numRadiusIncrements = 5; // .2
+		var fontSize = .4;
 		var points = generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements);
 		
-		console.log('Total count of letters:', points.length);
+		console.log('Total objects in universe:', points.length);
 		var midway = maxWidth/2 + xPosition;
 
 		var leftMat = createMaterial(0xFF6600),
@@ -422,28 +422,26 @@ function drawLetters(scene) {
 		
 		var fontShapes = [];
 		for (let i = 0; possible.length > i; i++) {
-			let geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], .5));
+			let geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
 			// make shape ( N.B. edge view not visible )
 			geometry.computeBoundingBox();
 			geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
 			fontShapes[i] = geometry;
 		}
-		console.log(fontShapes);
 
 		points.forEach((pos) => {
 			let curMesh;
-			if (pos.x < midway){
+			if (pos.x < midway - 20){
 				curMesh = leftMat;
-			} else if (pos.x < midway) {
-			} else {
+			} else if (pos.x > midway + 20) {
 				curMesh = rightMat;
+			} else {
+				curMesh = centerMat;
 			}
 
 			let letterPos = Math.floor(Math.random() * possible.length);
-//			console.log(possible[letterPos], letterPos, fontShapes[letterPos], curMesh);
 
 			let mesh = new THREE.Mesh(fontShapes[letterPos], curMesh);
-
 
 			mesh.position.x = pos.x;
 			mesh.position.y = pos.y;
@@ -453,9 +451,9 @@ function drawLetters(scene) {
 
 			// do update after properties are set as part of startup process
 			mesh.updateMatrix();
-			// don't auto update every frame
+			// don't auto update every frame for this mesh
 			mesh.matrixAutoUpdate = false;
-
+			
 			scene.add(mesh);
 			assignToBucket(mesh);
 
