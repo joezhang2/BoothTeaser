@@ -3,16 +3,56 @@
 <style>
     body {
         margin: 0;
+		font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif
     }
+	.main-container {
+		position:absolute;
+		top:0;left:0;bottom:0;right:0;
+	}
+	.sidebar {
+		position:absolute; 
+		top:0;right:0;bottom:0; 
+		width:350px; 
+
+		perspective: 360px; 
+		perspective-origin: 15% 50%;
+	}
+	.flow {
+		position:absolute; 
+		top:0;left:0;right:350px;bottom:0; 
+/*		background-color:rgba(0,0,50,0.3); */
+	}
+	.info-box {
+		border-radius: 10px;
+		border: 2px solid #00999966;
+		background-image: radial-gradient(#00dddd66 10%, #00aaaa33 80%, #00aaaa99 100%);
+		
+		transform: scale(1.0) scaleZ(1) rotateY(-5deg) translateZ(-50px);
+		transform-origin: 0% 0%;
+		padding:25px;
+		color:aqua;
+		margin:10px;
+/*		clip-path: polygon(0 29%, 20% 0, 100% 0, 100% 100%, 0 100%);*/
+	}
+
 </style>
 </head>
 
 <body>
     <script src="//cdn.rawgit.com/mrdoob/three.js/master/build/three.min.js"></script>
 	<script src="letters.js"></script>
-	
-	<div style="position:absolute; top:0;left:0;right:350px;bottom:0; background-color:rgba(0,0,50,0.3);">This is on the left</div>
-	<div style="position:absolute; top:0;right:0;bottom:0; width:350px; background-color:rgba(50,0,0,0.5);">This is an image of a dude</div>
+
+	<div class="main-container">
+		<div class="flow">This is on the left</div>
+		<div class="sidebar">
+			<div class="info-box" style="text-align:center;">
+				<img src="images/3.jpg" width="200" height="120">
+			</div>
+			<div class="info-box">
+					This is an image of a dude
+				</div>
+			</div>
+	</div>
 </body>
 </html>
 
