@@ -8,3 +8,4 @@ clover.xml
 npm-debug.log
 package-lock.json
 dist
+.DS_Store
