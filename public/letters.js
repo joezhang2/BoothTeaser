@@ -16,7 +16,8 @@ var cameraOriginDims = {
     y: 0,
     z: 1
 };
-var cameraHoverDistance = 250;
+// var cameraHoverDistance = 150;
+var cameraHoverDistance = 65;
 //var meshes = [];
 var frustumSize = 1000;
 
@@ -42,7 +43,7 @@ function init() {
     fogColor = new THREE.Color(0x000);
     scene.background = fogColor;
     scene.fog = new THREE.Fog(fogColor, 50, 175);
-
+    
     // PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
     
     camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 175);
@@ -109,8 +110,8 @@ function assignToBucket (mesh) {
     
     var bucketSlice = Math.floor(angleDeg / bucketAngleSize);
     var bucketAngle = bucketSlice * bucketAngleSize;
-
- // console.log(angleDeg, angleRads, bucketSlice, bucketAngle, p2.x, p2.y);
+    
+    // console.log(angleDeg, angleRads, bucketSlice, bucketAngle, p2.x, p2.y);
     if (!meshBuckets[bucketAngle]) {
         meshBuckets[bucketAngle] = [];
     }
@@ -152,7 +153,8 @@ function animate() {
     
 }
 
-var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+//var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+var possible = 'abcdefghijklmnopqrstuvwxyz';
 
 function perc2color(perc, min, max) {
     var base = (max - min);
@@ -174,26 +176,34 @@ function perc2color(perc, min, max) {
     return '#' + ('000000' + h.toString(16)).slice(-6);
 }
 
-function drawLetter(font, perc) {
-    var xMid, letter;
-    var color = new THREE.Color(perc2color(perc, 0, 100)); //0x006600;
- // console.log(perc, color);
-    var matLite = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: minMaxRand(0.3, 1)
-           // ,side: THREE.DoubleSide
-    });
+function drawLetter(font) {
     
-    var message = possible.charAt(Math.floor(Math.random() * possible.length));
-    var shapes = font.generateShapes(message, 1);
-    var geometry = new THREE.ShapeBufferGeometry(shapes);
-    geometry.computeBoundingBox();
-    xMid = -0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x);
-    geometry.translate(xMid, 0, 0);
-    // make shape ( N.B. edge view not visible )
-    letter = new THREE.Mesh(geometry, matLite);
-    return letter;
+    var letters = [];
+    
+    for (var i = 0; i < 2; i ++) {
+        var xMid;
+        var perc = Math.random() * 100;
+        var color = new THREE.Color(perc2color(perc, 0, 100)); //0x006600;
+        // console.log(perc, color);
+        var matLite = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: false,
+            opacity: 1 //minMaxRand(0.3, 1)
+            // ,side: THREE.DoubleSide
+        });
+        
+        // var message = possible.charAt(Math.floor(Math.random() * possible.length));
+        // var shapes = font.generateShapes(message, 1);
+        // var geometry = new THREE.ShapeBufferGeometry(shapes);
+        // geometry.computeBoundingBox();
+        // xMid = -0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x);
+        // geometry.translate(xMid, 0, 0);
+        // // make shape ( N.B. edge view not visible )
+        // letters.push({g: geometry, m: matLite});
+        letters.push(matLite);
+    }
+    return letters;
+    
 }
 
 function minMaxRand(min, max) {
@@ -233,7 +243,7 @@ function generateCylinder(centerPoint, edgePoint, density, height, numHeightStep
         for (var currentIncrement = 0; currentIncrement < numRadiusIncrements; currentIncrement++) {
             var angle = (currentIncrement * angleIncrement + offset),
                     currentRadius = maxRadius * currentIncrement / numRadiusIncrements;
-    
+            
             if (currentRadius/maxRadius > .6) {
                 var point = createPointOnSpiral(centerPoint, currentIncrement, currentRadius, maxRadius, numRadiusIncrements, angle, shiftHeight, maxHeightVariance);
                 vertices.push(point);
@@ -277,6 +287,85 @@ function generateCylinder(centerPoint, edgePoint, density, height, numHeightStep
 }
 
 
+function generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements) {
+    
+    function calculateRandomAngleInArc(minArcLength, maxArcLength, radius) {
+        var circumference = 2 * Math.PI * radius;
+        var startingAngle = 2 * Math.PI * minArcLength / circumference;
+        var endingAngle = 2 * Math.PI * maxArcLength / circumference;
+        
+        return .3 * Math.random() * (endingAngle - startingAngle) + startingAngle;
+    }
+    
+    function generateRandomPointOnArc(currentRadius, minArcLength, maxArcLength, arcRadius) {
+        var angle = calculateRandomAngleInArc(minArcLength, maxArcLength, arcRadius);
+        
+        return {
+            y: currentRadius * Math.sin(angle),
+            z: currentRadius * Math.cos(angle)
+        };
+    }
+    
+    function generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance) {
+        var x, y, z;
+        var radius = minRadius + (maxRadius - minRadius) * Math.random();
+        
+        var pointOnArc = generateRandomPointOnArc(radius, currentMinArc, currentMaxArc, minRadius);
+        
+        x = (widthVariance ? widthOffset * .3 * Math.random() : 0)+ leftWidthBoundary;
+        y = pointOnArc.y;
+        z = pointOnArc.z;
+        return {x: x, y: y, z: z};
+    }
+    
+    function generateRing(leftWidthBoundary, widthOffset, minRadius, maxRadius, widthVariance) {
+        var numMinArcSteps = Math.ceil((minRadius * 2 * Math.PI) / (widthOffset));
+        var minArcIncrement = (minRadius * 2 * Math.PI) / numMinArcSteps;
+        
+        var vertices = [];
+        
+        for (var currentArcIncrement = 0; currentArcIncrement < numMinArcSteps; currentArcIncrement++) {
+            var currentMinArc = currentArcIncrement * minArcIncrement;
+            var currentMaxArc = currentMinArc + minArcIncrement ;
+            
+            vertices.push(generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance));
+        }
+        return vertices;
+    }
+    
+    function generateDisk(leftWidthBoundary, widthOffset, maxRadius, minRadius, numRadiusIncrements, widthVariance) {
+        var radiusIncrement = (maxRadius - minRadius)/ numRadiusIncrements;
+        var vertices = [];
+        
+        //Generate points on inner diameter
+        vertices = vertices.concat(generateRing(leftWidthBoundary, widthOffset, minRadius, minRadius, widthVariance));
+        
+        // Generate points inside ring
+        for(var currentRadius = minRadius; currentRadius < maxRadius; currentRadius += radiusIncrement) {
+            vertices = vertices.concat(generateRing(leftWidthBoundary, widthOffset, currentRadius, currentRadius + radiusIncrement, widthVariance));
+        }
+        //Generate points on outer diameter
+        vertices = vertices.concat(generateRing(leftWidthBoundary, widthOffset, maxRadius, maxRadius, widthVariance));
+        
+        return vertices;
+    }
+    
+    var widthIncrement = maxWidth / numWidthIncrement;
+    var endWith = xPosition + maxWidth;
+    
+    var vertices = [];
+    
+    vertices = vertices.concat(generateDisk(xPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false));
+    
+    for(var currentXPosition = xPosition; currentXPosition < endWith; currentXPosition += widthIncrement) {
+        vertices = vertices.concat(generateDisk(currentXPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, true));
+    }
+    
+    vertices = vertices.concat(generateDisk(endWith, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false));
+    return vertices;
+}
+
+
 function generateRandom(count) {
     var points = [];
     var pos = {
@@ -308,31 +397,80 @@ function drawLetters(scene) {
     var loader = new THREE.FontLoader();
     
     loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function generateFontForrest(font) {
-        var centerPoint = {x: -75, y: 0, z: 0};
-        var edgePoint = {x: -75, y: 150, z: 150};
-        var height = 150;
-        var heightIncrements = 100;
-        var density = .3;
-    
-        var count = 22500;
-        var count = 9000;
-        var points = generateRandom(count);
+        // var count = 22500;
+        // var count = 9000;
+        // var points = generateRandom(count);
+        
+        // var centerPoint = {x: -75, y: 0, z: 0};
+        // var edgePoint = {x: -75, y: 150, z: 150};
+        // var height = 150;
+        // var heightIncrements = 100;
+        // var density = .3;
         // var points = generateCylinder(centerPoint, edgePoint, density, height, heightIncrements);
-    
+        
+        var xPosition = -20;
+        var maxWidth = 30;
+        var numWidthIncrement = 15;
+        var maxRadius = 47;
+        var minRadius = 46;
+        var numRadiusIncrements = .2
+        ;
+        var points = generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements);
+        
         console.log('Total count of letters:', points.length);
+        var midway = maxWidth/2 + xPosition;
+        var meshInfo = drawLetter(font);
+        // noinspection BadExpressionStatementJS
+        
+        
+        var message = possible.charAt(Math.floor(Math.random() * possible.length));
+        var shapes = font.generateShapes(message, 1);
+        var geometry = new THREE.ShapeBufferGeometry(shapes);
+        geometry.computeBoundingBox();
+        xMid = -0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x);
+        geometry.translate(xMid, 0, 0);
+        // make shape ( N.B. edge view not visible )
+        
+        var perc = Math.random() * 100;
+        var color = new THREE.Color(perc2color(perc, 0, 100)); //0x006600;
+        // console.log(perc, color);
+        var matLite1 = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: false,
+            opacity: 1 //minMaxRand(0.3, 1)
+            // ,side: THREE.DoubleSide
+        });
+        
+        
+        var perc1 = Math.random() * 100;
+        var color1 = new THREE.Color(perc2color(perc1, 0, 100)); //0x006600;
+        // console.log(perc, color);
+        var matLite2 = new THREE.MeshBasicMaterial({
+            color: color1,
+            transparent: false,
+            opacity: 1 //minMaxRand(0.3, 1)
+            // ,side: THREE.DoubleSide
+        });
         
         points.forEach((pos) => {
-            var mesh = drawLetter(font, ((pos.x + 75) / 150) * 100);
+            var curMesh;
+            if (pos.x > midway){
+                curMesh = matLite1;
+            } else {
+                curMesh = matLite2;
+            }
+            
+            var mesh = new THREE.Mesh(geometry, curMesh);
             mesh.position.x = pos.x;
             mesh.position.y = pos.y;
             mesh.position.z = pos.z;
-    
+            
             angleLetter(mesh);
             mesh.updateMatrix();
             mesh.matrixAutoUpdate = false;
             scene.add(mesh);
             assignToBucket(mesh);
-            
+
 //      meshes.push(mesh);
         });
         
