@@ -94,7 +94,7 @@ function init() {
 
 // shapes pre-organized into buckets based on angle ranges so we can rotate only the ones in view
 var meshBuckets = {};
-var totalBuckets = 120;
+var totalBuckets = 30;
 var bucketAngleSize = 360 / totalBuckets;
 
 function assignToBucket (mesh) {
@@ -218,7 +218,7 @@ function hideCulledMeshes (rotation) {
 
 	for(let sliceAngle in meshBuckets) {
 		//if (+sliceAngle < minAngle || +sliceAngle > maxAngle) {
-		if (!isInRange(sliceAngle)) {
+		if (isInRange(sliceAngle)) {
 			meshBuckets[sliceAngle].forEach((mesh)=>{
 				mesh.visible ? mesh.visible = false : 0;
 			}) 
