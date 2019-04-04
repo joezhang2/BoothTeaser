@@ -99,23 +99,29 @@ var bucketAngleSize = 360 / totalBuckets;
 
 function assignToBucket (mesh) {
 	var p1 = { x:0, y:0},
-			p2 = { x: mesh.position.y, y: mesh.position.z };
+		p2 = { x: mesh.position.y, y: mesh.position.z };
 	
 	// angle in radians
 //	var angleRads = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 	
-	// angle in degrees
-	var angleDeg = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+	// angle in degrees to get to letter point
+	var angleToLetterDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI);
 	
-	var bucketSlice = Math.floor(angleDeg / bucketAngleSize);
-	var bucketAngle = bucketSlice * bucketAngleSize;
-	
-	// console.log(angleDeg, angleRads, bucketSlice, bucketAngle, p2.x, p2.y);
+	// number of times the bucket angle size goes into the angle to the letter
+	var bucketSlice = Math.floor(angleToLetterDeg / bucketAngleSize);
+	// put the letter in a bucket lesser than the next angle
+	// var bucketAngle = (bucketSlice * bucketAngleSize) + 180;
+
+	var bucketAngle = (bucketSlice * bucketAngleSize);
+	bucketAngle = bucketAngle < 0 ? bucketAngle + 360 : bucketAngle;
+
 	if (!meshBuckets[bucketAngle]) {
 		meshBuckets[bucketAngle] = [];
 	}
-	// console.log(meshBuckets[bucketAngle]);
 	meshBuckets[bucketAngle].push(mesh);
+	console.log('buckets', meshBuckets)
+	// console.log(angleToLetterDeg, bucketSlice, bucketAngle, p2.x, p2.y);
+	// console.log(meshBuckets[bucketAngle]);
 }
 
 var resizeThrottle;
@@ -141,7 +147,7 @@ var angle = 0;
 
 function render () {
 	
-	angle += 0.1;
+	angle = (angle + 0.5) % 360;
 	
 	let rotation = rads(angle + 270);
 	hideCulledMeshes(rotation);
@@ -149,31 +155,70 @@ function render () {
 	camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1);
 	camera.position.y = cameraHoverDistance * Math.cos(rads(angle));
 	camera.position.z = cameraHoverDistance * Math.sin(rads(angle));
-	
+	console.log('xyz',camera.position.x, camera.position.y, camera.position.z);
 	camera.rotation.x = rads(angle + 270);
+	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.05;
 	camera.updateMatrix();
 	
 	renderer.render(scene, camera);
 };
 
+/*
+	// Calculate the rotation angle of the camera
+	let origin = { x:0, y:0 },
+		cameraPos = { x: camera.position.y, y: camera.position.z },
+		angleRads = Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x); //  * 180 / Math.PI
+
+	if (angleRads > 2*Math.PI) {
+		angleRads = angleRads % (2*Math.PI);
+	}
+
+	// calculate the 
+	let minAngle = angleRads + (Math.PI/2), // angleDeg - 90,
+		maxAngle = angleRads - (Math.PI/2); // angleDeg + 90;
+	
+	if (minAngle > 2*Math.PI) { minAngle = minAngle % (2*Math.PI); }
+	if (maxAngle > 2*Math.PI) { maxAngle = maxAngle % (2*Math.PI); }
+*/
 
 function hideCulledMeshes (rotation) {
-	let origin = { x:0, y:0},
-		cameraPos = { x: camera.position.y, y: camera.position.z },
-		angleDeg = Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x) * 180 / Math.PI,
-		minAngle = angleDeg - 90,
+	// Calculate the rotation angle of the camera
+	let origin = { x:0, y:0 },
+		cameraPos = { x: camera.position.z, y: camera.position.y },
+		angleDeg = (Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x) * 180 / Math.PI);
+
+	// atan returns -179 through -0.001 beyond 180 degress, so add 360 to give us the positive angles rather than a negative bucket angle
+	angleDeg = angleDeg < 0 ? angleDeg + 360 : angleDeg;
+
+	console.log('Angle before maths', angleDeg, 
+		'rads', Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x),
+		'x<-y', camera.position.y, 'y<-z', camera.position.z);
+
+	let minAngle = angleDeg - 90,
 		maxAngle = angleDeg + 90;
 
-	if (angleDeg > 360) { angleDeg = angleDeg % 360; }
-	if (minAngle > 360) { minAngle = minAngle % 360; }
-	if (maxAngle > 360) { maxAngle = maxAngle % 360; }
+
+	function isInRange(bucketAngle) {
+		if(angleDeg < 90) {
+			// max bucket
+			return (angleDeg + 90 > bucketAngle) &&
+			// min bucket	
+			(360 - (90 - angleDeg) < bucketAngle);
+		} else {
+			// max bucket
+			return (angleDeg + 90 > bucketAngle) &&
+			// min bucket
+			(angleDeg - 90 < bucketAngle);
+		}
+	}
 
 	console.log('View angle to camera', angleDeg, minAngle, maxAngle);
 
 	if (!meshBuckets || !Object.keys(meshBuckets) || Object.keys(meshBuckets).length === 0) { return; }
 
 	for(let sliceAngle in meshBuckets) {
-		if (+sliceAngle < minAngle || +sliceAngle > maxAngle) {
+		//if (+sliceAngle < minAngle || +sliceAngle > maxAngle) {
+		if (!isInRange(sliceAngle)) {
 			meshBuckets[sliceAngle].forEach((mesh)=>{
 				mesh.visible ? mesh.visible = false : 0;
 			}) 
@@ -527,7 +572,10 @@ function drawLetters(scene) {
 			assignToBucket(mesh);
 
 		});
-		
+
+		console.log(meshBuckets);
+		debugger;
+		console.log('hi');
 	}); //end load function
 	
 }
