@@ -10,7 +10,9 @@ var boxRotationDims = {
 };
 var pageCenterDims = {
 	x: 0,
-	y: 0
+	y: 0,
+	width: 0,
+	height: 0
 };
 var cameraOriginDims = {
 	x: 0,
@@ -35,10 +37,10 @@ function init() {
 	
 	var fogColor = new THREE.Color(0x000000);
 	scene.background = fogColor;
-	scene.fog = new THREE.Fog(fogColor, 20, 40);	
+	scene.fog = new THREE.Fog(fogColor, 20, 60);	
 
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-	camera = new THREE.PerspectiveCamera(70, aspect, 10, 40);
+	camera = new THREE.PerspectiveCamera(70, aspect, 10, 60); // 40
 
 	camera.matrixAutoUpdate = false;
 
@@ -94,7 +96,7 @@ function init() {
 
 // shapes pre-organized into buckets based on angle ranges so we can rotate only the ones in view
 var meshBuckets = {};
-var totalBuckets = 30;
+var totalBuckets = 120;
 var bucketAngleSize = 360 / totalBuckets;
 
 function assignToBucket (mesh) {
@@ -119,9 +121,6 @@ function assignToBucket (mesh) {
 		meshBuckets[bucketAngle] = [];
 	}
 	meshBuckets[bucketAngle].push(mesh);
-	console.log('buckets', meshBuckets)
-	// console.log(angleToLetterDeg, bucketSlice, bucketAngle, p2.x, p2.y);
-	// console.log(meshBuckets[bucketAngle]);
 }
 
 var resizeThrottle;
@@ -147,7 +146,7 @@ var angle = 0;
 
 function render () {
 	
-	angle = (angle + 0.5) % 360;
+	angle = (angle + 0.1) % 360;
 	
 	let rotation = rads(angle + 270);
 	hideCulledMeshes(rotation);
@@ -155,11 +154,13 @@ function render () {
 	camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1);
 	camera.position.y = cameraHoverDistance * Math.cos(rads(angle));
 	camera.position.z = cameraHoverDistance * Math.sin(rads(angle));
-	console.log('xyz',camera.position.x, camera.position.y, camera.position.z);
 	camera.rotation.x = rads(angle + 270);
 	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.05;
 	camera.updateMatrix();
-	
+
+	// Scenes 
+//	scene.matrixWorldNeedsUpdate = false;
+
 	renderer.render(scene, camera);
 };
 
@@ -181,50 +182,50 @@ function render () {
 	if (maxAngle > 2*Math.PI) { maxAngle = maxAngle % (2*Math.PI); }
 */
 
+function isInView(bucketAngle, angleDeg) {
+	var min, max;
+
+	if(angleDeg < 90) {
+		min = (angleDeg + 360) - 90;
+		max = angleDeg + 90;
+		return (bucketAngle < max) || // if 1 then buckets less than 91 are in view
+			(bucketAngle > min) // if 1 then buckets greater than 271 are in view
+	} else if (angleDeg > 270) {
+		min = angleDeg - 90;
+		max = ((angleDeg + 360) + 90) % 360;
+		return (bucketAngle < max) || // if 271 then buckets less than 1 are in view
+			(bucketAngle > min) // if 271 then buckets greater than 181 are in view
+	} else {
+		min = angleDeg - 90;
+		max = angleDeg + 90;
+		return (bucketAngle <= max) && // if 180 then buckets less than 270 are in view
+			(bucketAngle >= min) // if 180 then buckets greater than 90 are in view
+	}
+}
+
+
 function hideCulledMeshes (rotation) {
 	// Calculate the rotation angle of the camera
-	let origin = { x:0, y:0 },
-		cameraPos = { x: camera.position.y, y: camera.position.z },
-		angleDeg = (Math.atan2(cameraPos.x - origin.x, cameraPos.y - origin.y) * 180 / Math.PI);
+	var origin = { x:0, y:0 },
+		cameraPos = { x: camera.position.y, y: camera.position.z };
+	var angleDeg = (Math.atan2(cameraPos.x - origin.x, cameraPos.y - origin.y) * 180 / Math.PI);
 
 	// atan returns -179 through -0.001 beyond 180 degress, so add 360 to give us the positive angles rather than a negative bucket angle
 	angleDeg = angleDeg < 0 ? angleDeg + 360 : angleDeg;
 
-	console.log('Angle before maths', angleDeg, 
-		'rads', Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x),
-		'x<-y', camera.position.y, 'y<-z', camera.position.z);
-
-	let minAngle = angleDeg - 90,
-		maxAngle = angleDeg + 90;
-
-
-	function isInRange(bucketAngle) {
-		if(angleDeg < 90) {
-			// max bucket
-			return (angleDeg + 90 > bucketAngle) &&
-			// min bucket	
-			(360 - (90 - angleDeg) < bucketAngle);
-		} else {
-			// max bucket
-			return (angleDeg + 90 > bucketAngle) &&
-			// min bucket
-			(angleDeg - 90 < bucketAngle);
-		}
-	}
-
-	console.log('View angle to camera', angleDeg, minAngle, maxAngle);
-
 	if (!meshBuckets || !Object.keys(meshBuckets) || Object.keys(meshBuckets).length === 0) { return; }
 
 	for(let sliceAngle in meshBuckets) {
-		//if (+sliceAngle < minAngle || +sliceAngle > maxAngle) {
-		if (isInRange(sliceAngle)) {
+//		console.log(sliceAngle);
+		if (!isInView(+sliceAngle, angleDeg)) {
 			meshBuckets[sliceAngle].forEach((mesh)=>{
-				mesh.visible ? mesh.visible = false : 0;
+				mesh.visible = false;
+				mesh.matrixWorldNeedsUpdate = false;
 			}) 
 		} else {
 			meshBuckets[sliceAngle].forEach((mesh)=>{
-				!mesh.visible ? mesh.visible = true : 0;
+				mesh.visible = true;
+				mesh.matrixWorldNeedsUpdate = true;
 			}) 
 		}
 	}
@@ -468,7 +469,9 @@ function createMaterial (color) {
 
 	return new THREE.MeshBasicMaterial({
 		color: color,
-		transparent: true
+		transparent: true,
+		side: THREE.DoubleSide
+
 // None of the options below significantly improved rendering performance		
 //		reflectivity: 0,
 //		depthWrite: false,
@@ -565,17 +568,18 @@ function drawLetters(scene) {
 
 			// do update after properties are set as part of startup process
 			mesh.updateMatrix();
+			
 			// don't auto update every frame for this mesh
 			mesh.matrixAutoUpdate = false;
 			
+			// try to save some cycles in calculating what to show and hide by doing this ourselves using in view mesh buckets
+			// mesh.frustumCulled = false; // this worked horribly. Double the render object calls. 
+
 			scene.add(mesh);
 			assignToBucket(mesh);
 
 		});
 
-		console.log(meshBuckets);
-		debugger;
-		console.log('hi');
 	}); //end load function
 	
 }
