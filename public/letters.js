@@ -105,7 +105,7 @@ function assignToBucket (mesh) {
 //	var angleRads = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 	
 	// angle in degrees to get to letter point
-	var angleToLetterDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI);
+	var angleToLetterDeg = (Math.atan2(p2.x - p1.x, p2.y - p1.y) * 180 / Math.PI);
 	
 	// number of times the bucket angle size goes into the angle to the letter
 	var bucketSlice = Math.floor(angleToLetterDeg / bucketAngleSize);
@@ -184,8 +184,8 @@ function render () {
 function hideCulledMeshes (rotation) {
 	// Calculate the rotation angle of the camera
 	let origin = { x:0, y:0 },
-		cameraPos = { x: camera.position.z, y: camera.position.y },
-		angleDeg = (Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x) * 180 / Math.PI);
+		cameraPos = { x: camera.position.y, y: camera.position.z },
+		angleDeg = (Math.atan2(cameraPos.x - origin.x, cameraPos.y - origin.y) * 180 / Math.PI);
 
 	// atan returns -179 through -0.001 beyond 180 degress, so add 360 to give us the positive angles rather than a negative bucket angle
 	angleDeg = angleDeg < 0 ? angleDeg + 360 : angleDeg;
