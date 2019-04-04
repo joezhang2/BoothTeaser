@@ -37,10 +37,10 @@ function init() {
 	
 	var fogColor = new THREE.Color(0x000000);
 	scene.background = fogColor;
-	scene.fog = new THREE.Fog(fogColor, 20, 60);	
+	scene.fog = new THREE.Fog(fogColor, 10, 60);	
 
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-	camera = new THREE.PerspectiveCamera(70, aspect, 10, 60); // 40
+	camera = new THREE.PerspectiveCamera(50, aspect, 10, 70); // 40
 
 	camera.matrixAutoUpdate = false;
 
@@ -78,7 +78,7 @@ function init() {
 	
 	// WebGL 2 looks to be supported in Chrome and FF, but not in Safari Tech Preview very well.
 	canvas = document.createElement('canvas');
-	canvas.style.background = '#000';
+	canvas.style.background = '#000000';
 	context = canvas.getContext('webgl2'); // webgl2 for that engine
 	renderer = new THREE.WebGLRenderer({
 		canvas: canvas,
@@ -148,18 +148,18 @@ function render () {
 	
 	angle = (angle + 0.1) % 360;
 	
-	let rotation = rads(angle + 270);
-	hideCulledMeshes(rotation);
+//	let rotation = rads(angle + 270);
+	hideCulledMeshes();
 
 	camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1);
 	camera.position.y = cameraHoverDistance * Math.cos(rads(angle));
 	camera.position.z = cameraHoverDistance * Math.sin(rads(angle));
 	camera.rotation.x = rads(angle + 270);
-	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.05;
+	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.03;
 	camera.updateMatrix();
 
 	// Scenes 
-//	scene.matrixWorldNeedsUpdate = false;
+	scene.matrixWorldNeedsUpdate = false;
 
 	renderer.render(scene, camera);
 };
@@ -204,7 +204,7 @@ function isInView(bucketAngle, angleDeg) {
 }
 
 
-function hideCulledMeshes (rotation) {
+function hideCulledMeshes () {
 	// Calculate the rotation angle of the camera
 	var origin = { x:0, y:0 },
 		cameraPos = { x: camera.position.y, y: camera.position.z };
@@ -366,7 +366,7 @@ function generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius
 		var startingAngle = 2 * Math.PI * minArcLength / circumference;
 		var endingAngle = 2 * Math.PI * maxArcLength / circumference;
 		
-		return .3 * Math.random() * (endingAngle - startingAngle) + startingAngle;
+		return .6 * Math.random() * (endingAngle - startingAngle) + startingAngle;
 	}
 	
 	function generateRandomPointOnArc(currentRadius, minArcLength, maxArcLength, arcRadius) {
@@ -380,11 +380,11 @@ function generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius
 	
 	function generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance) {
 		var x, y, z;
-		var radius = minRadius + (maxRadius - minRadius) * Math.random();
+		var radius = minRadius + (maxRadius - minRadius) * Math.random() * .6;
 		
 		var pointOnArc = generateRandomPointOnArc(radius, currentMinArc, currentMaxArc, minRadius);
 		
-		x = (widthVariance ? widthOffset * .3 * Math.random() : 0)+ leftWidthBoundary;
+		x = (widthVariance ? widthOffset * .6 * Math.random() : 0)+ leftWidthBoundary;
 		y = pointOnArc.y;
 		z = pointOnArc.z;
 		return {x: x, y: y, z: z};
@@ -470,7 +470,7 @@ function createMaterial (color) {
 	return new THREE.MeshBasicMaterial({
 		color: color,
 		transparent: true,
-		side: THREE.DoubleSide
+		side: THREE.FrontSide
 
 // None of the options below significantly improved rendering performance		
 //		reflectivity: 0,
@@ -483,21 +483,6 @@ function createMaterial (color) {
 		// ,side: THREE.DoubleSide
 	});
 
-/*
-	return new THREE.ShaderMaterial({
-		uniforms: {
-			color: { type: 'v3', value: new THREE.Color(color) }
-		},
-		vertexShader: 'attribute vec3 vert;\n'
-				+ 'void main() {\n'
-				+ '  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n'
-				+ '}',
-		fragmentShader: 'uniform vec3 color;\n'
-				+ 'void main() {\n'
-				+ '  gl_FragColor = vec4(color,1);\n'
-				+ '}'
-	});
-*/
 }
 
 
@@ -516,20 +501,20 @@ function drawLetters(scene) {
 		// var density = .3;
 		// var points = generateCylinder(centerPoint, edgePoint, density, height, heightIncrements);
 		
-		var xPosition = -45; // 20
-		var maxWidth = 90; // 30
+		var maxWidth = 80; // 30
+		var xPosition = (maxWidth / 2) * -1; // 20
 		var numWidthIncrement = 40; // 15
 		var maxRadius = 50; // 47
-		var minRadius = 30; // 46
-		var numRadiusIncrements = 5; // .2
-		var fontSize = .4;
+		var minRadius = 20; // 46
+		var numRadiusIncrements = 10; // .2
+		var fontSize = .3;
 		var points = generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements);
 		
 		console.log('Total objects in universe:', points.length);
 		var midway = maxWidth/2 + xPosition;
 
 		var leftMat = createMaterial(0xFF7722),
-			centerMat = createMaterial(0x444444),
+			centerMat = createMaterial(0x111111),
 			rightMat = createMaterial(0x2277FF);
 
 		// noinspection BadExpressionStatementJS
@@ -547,10 +532,13 @@ function drawLetters(scene) {
 
 		points.forEach((pos) => {
 			let curMat;
-			if (pos.x < midway - 15){
+			let yRot = 0;
+			if (pos.x < midway - 20){
 				curMat = leftMat;
-			} else if (pos.x > midway + 15) {
+				yRot = 1;
+			} else if (pos.x > midway + 20) {
 				curMat = rightMat;
+				yRot = -1;
 			} else {
 				curMat = centerMat;
 			}
@@ -563,6 +551,7 @@ function drawLetters(scene) {
 			mesh.position.z = pos.z;
 			
 			mesh.rotation.x = angleLetter(mesh.position);
+			mesh.rotation.y = mesh.rotation.y + yRot;
 
 //			mesh.visible = false;
 
