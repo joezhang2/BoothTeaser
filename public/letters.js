@@ -156,31 +156,51 @@ function render () {
 	renderer.render(scene, camera);
 };
 
-function hideCulledMeshes (rotation) {
-	var p1 = { x:0, y:0},
-	p2 = { x: camera.position.y, y: camera.position.z };
 
-	var angleDeg = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+function hideCulledMeshes (rotation) {
+	let origin = { x:0, y:0},
+		cameraPos = { x: camera.position.y, y: camera.position.z },
+		angleDeg = Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x) * 180 / Math.PI,
+		minAngle = angleDeg - 90,
+		maxAngle = angleDeg + 90;
+
 	if (angleDeg > 360) { angleDeg = angleDeg % 360; }
+	if (minAngle > 360) { minAngle = minAngle % 360; }
+	if (maxAngle > 360) { maxAngle = maxAngle % 360; }
+
+	console.log('View angle to camera', angleDeg, minAngle, maxAngle);
 
 	if (!meshBuckets || !Object.keys(meshBuckets) || Object.keys(meshBuckets).length === 0) { return; }
 
-	var activeSlice = Math.floor( angleDeg / bucketAngleSize) * bucketAngleSize;
-
-	// only update one bucket right now, just to see something render with new buckets.
-	if (meshBuckets[ activeSlice ] && meshBuckets[ activeSlice ].length > 0) {
-
-		// this was changing the angle of the meshes in view at the 0 y axis (traditional graph not scene geo), 
-		// but we need make visible the > +90 degree and disapear the > -91 degree slice so it adds them and subtracts them as needed
-
-		meshBuckets[ activeSlice ].forEach((mesh) => {
-//			mesh.rotation.x = rotation;
-		});
-
-		console.log( 'slice size', meshBuckets[ activeSlice ].length );
-	} else {
-		console.log('Empty slice', activeSlice, meshBuckets[ activeSlice ], rotation, angleDeg, bucketAngleSize);
+	for(let sliceAngle in meshBuckets) {
+		if (+sliceAngle < minAngle || +sliceAngle > maxAngle) {
+			meshBuckets[sliceAngle].forEach((mesh)=>{
+				mesh.visible ? mesh.visible = false : 0;
+			}) 
+		} else {
+			meshBuckets[sliceAngle].forEach((mesh)=>{
+				!mesh.visible ? mesh.visible = true : 0;
+			}) 
+		}
 	}
+
+// 	var activeSlice = Math.floor( angleDeg / bucketAngleSize) * bucketAngleSize;
+
+
+// 	// only update one bucket right now, just to see something render with new buckets.
+// 	if (meshBuckets[ activeSlice ] && meshBuckets[ activeSlice ].length > 0) {
+
+// 		// this was changing the angle of the meshes in view at the 0 y axis (traditional graph not scene geo), 
+// 		// but we need make visible the > +90 degree and disapear the > -91 degree slice so it adds them and subtracts them as needed
+
+// 		meshBuckets[ activeSlice ].forEach((mesh) => {
+// //			mesh.rotation.x = rotation;
+// 		});
+
+// 		console.log( 'slice size', meshBuckets[ activeSlice ].length );
+// 	} else {
+// 		console.log('Empty slice', activeSlice, meshBuckets[ activeSlice ], rotation, angleDeg, bucketAngleSize);
+// 	}
 }
 
 function animate() {
@@ -400,6 +420,7 @@ function angleLetter(pos) {
 function createMaterial (color) {
 	var color = new THREE.Color(color); //0x006600;
 	// console.log(perc, color);
+
 	return new THREE.MeshBasicMaterial({
 		color: color,
 		transparent: true
@@ -413,6 +434,22 @@ function createMaterial (color) {
 //		opacity:  //Math.round(minMaxRand(0.3, 1) * 10).toFixed(2) 
 		// ,side: THREE.DoubleSide
 	});
+
+/*
+	return new THREE.ShaderMaterial({
+		uniforms: {
+			color: { type: 'v3', value: new THREE.Color(color) }
+		},
+		vertexShader: 'attribute vec3 vert;\n'
+				+ 'void main() {\n'
+				+ '  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n'
+				+ '}',
+		fragmentShader: 'uniform vec3 color;\n'
+				+ 'void main() {\n'
+				+ '  gl_FragColor = vec4(color,1);\n'
+				+ '}'
+	});
+*/
 }
 
 
@@ -479,7 +516,7 @@ function drawLetters(scene) {
 			
 			mesh.rotation.x = angleLetter(mesh.position);
 
-			mesh.visible = false;
+//			mesh.visible = false;
 
 			// do update after properties are set as part of startup process
 			mesh.updateMatrix();
