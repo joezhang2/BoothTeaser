@@ -9,26 +9,13 @@
 		position:absolute;
 		top:0;left:0;bottom:0;right:0;
 	}
-	.sidebar {
-		position:absolute; 
-		top:0;right:0;bottom:0; 
-		width:350px; 
-
-		perspective: 360px; 
-		perspective-origin: 15% 50%;
-	}
-	.flow {
-		position:absolute; 
-		top:0;left:0;right:350px;bottom:0; 
-/*		background-color:rgba(0,0,50,0.3); */
-	}
 	.info-box {
 		border-radius: 10px;
 		border: 2px solid #00999966;
 		background-image: radial-gradient(#00dddd66 10%, #00aaaa33 80%, #00aaaa99 100%);
 		
-		transform: scale(1.0) scaleZ(1) rotateY(-5deg) translateZ(-50px);
-		transform-origin: 0% 0%;
+/*		transform: scale(1.0) scaleZ(1) rotateY(-5deg) translateZ(-50px);
+		transform-origin: 0% 0%;*/
 		padding:25px;
 		color:aqua;
 		margin:10px;
@@ -39,28 +26,16 @@
 </head>
 
 <body>
-    <script src="https://unpkg.com/lodash@4.16.6"></script>
-    <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+    <!-- <script src="https://unpkg.com/lodash@4.16.6"></script> -->
+    <!-- <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script> -->
     <script src="js/three.js"></script>
+    <script src="js/face-api.js"></script>
     <script src="letters.js"></script>
-    <video style="position:absolute; top:0;right:0;bottom:0; width:1px;height: 1px;" onplay="onPlay(this)" id="inputVideo" autoplay muted></video>
-    <div id="left-div" style="position:absolute; top:0;left:0;right:350px;bottom:0; background-color:rgba(0,0,50,0.3);" />
-	<div style="position:absolute; top:0;right:0;bottom:0; width:350px; background-color:rgba(50,0,0,0.5);">This is an image of a dude</div>
-    <script src="./main.js"></script>
-<!--
-	//cdn.rawgit.com/mrdoob/three.js/master/build/
-	<div class="main-container">
-		<div class="flow">This is on the left</div>
-		<div class="sidebar">
-			<div class="info-box" style="text-align:center;">
-				<img src="images/3.jpg" width="200" height="120">
-			</div>
-			<div class="info-box">
-					This is an image of a dude
-				</div>
-			</div>
-	</div>
--->
+    <script src="detect-faces.js"></script>
+    <video style="position:absolute; top:0;left:0; width:1000px;height: 1000px; z-index: 100" onplay="onPlay(this)" id="inputVideo" autoplay muted></video>
+    <div id="left-div"></div>
+    <!-- <script src="./main.js"></script> -->
+
 </body>
 </html>
 

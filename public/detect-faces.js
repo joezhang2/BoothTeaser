@@ -1,6 +1,4 @@
-import _ from 'lodash';
-
-const faceapi = require('face-api.js');
+const faceapi = window.faceapi;
 const MODELS_PATH = '/public/models';
 const lastNames = ['SMITH','JOHNSON','WILLIAMS','BROWN','JONES','MILLER','DAVIS','GARCIA','RODRIGUEZ','WILSON','MARTINEZ','ANDERSON','TAYLOR','THOMAS','HERNANDEZ','MOORE','MARTIN','JACKSON','THOMPSON','WHITE','LOPEZ','LEE','GONZALEZ','HARRIS','CLARK','LEWIS','ROBINSON','WALKER','PEREZ','HALL','YOUNG','ALLEN','SANCHEZ','WRIGHT','KING','SCOTT','GREEN','BAKER','ADAMS','NELSON','HILL','RAMIREZ','CAMPBELL','MITCHELL','ROBERTS','CARTER','PHILLIPS','EVANS','TURNER','TORRES','PARKER','COLLINS','EDWARDS','STEWART','FLORES','MORRIS','NGUYEN','MURPHY','RIVERA','COOK','ROGERS','MORGAN','PETERSON','COOPER','REED','BAILEY','BELL','GOMEZ','KELLY','HOWARD','WARD','COX','DIAZ','RICHARDSON','WOOD','WATSON','BROOKS','BENNETT','GRAY','JAMES','REYES','CRUZ','HUGHES','PRICE','MYERS','LONG','FOSTER','SANDERS','ROSS','MORALES','POWELL','SULLIVAN','RUSSELL','ORTIZ','JENKINS','GUTIERREZ','PERRY','BUTLER','BARNES','FISHER','HENDERSON','COLEMAN','SIMMONS','PATTERSON','JORDAN','REYNOLDS','HAMILTON','GRAHAM','KIM','GONZALES','ALEXANDER','RAMOS','WALLACE','GRIFFIN','WEST','COLE','HAYES','CHAVEZ','GIBSON','BRYANT','ELLIS','STEVENS','MURRAY','FORD','MARSHALL','OWENS','MCDONALD','HARRISON','RUIZ','KENNEDY','WELLS','ALVAREZ','WOODS','MENDOZA','CASTILLO','OLSON','WEBB','WASHINGTON','TUCKER','FREEMAN','BURNS','HENRY','VASQUEZ','SNYDER','SIMPSON','CRAWFORD','JIMENEZ','PORTER','MASON','SHAW','GORDON','WAGNER','HUNTER','ROMERO','HICKS','DIXON','HUNT','PALMER','ROBERTSON','BLACK','HOLMES','STONE','MEYER','BOYD','MILLS','WARREN','FOX','ROSE','RICE','MORENO','SCHMIDT','PATEL','FERGUSON','NICHOLS','HERRERA','MEDINA','RYAN','FERNANDEZ','WEAVER','DANIELS','STEPHENS','GARDNER','PAYNE','KELLEY','DUNN','PIERCE','ARNOLD','TRAN','SPENCER','PETERS','HAWKINS','GRANT','HANSEN','CASTRO','HOFFMAN','HART','ELLIOTT','CUNNINGHAM','KNIGHT'];
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -17,19 +15,22 @@ class BannerHandler {
   }
 
   updateCanvases(currentFaces){
-    console.log(currentFaces, this.q1)
-    while(this.q1.length > 0){
-      const temp = this.q1.pop();
-      if(temp in currentFaces){
-        console.log(temp, currentFaces)
-        this.current = temp
-        const leftDiv = document.getElementById("left-div");
-        leftDiv.appendChild(currentFaces[temp].canvas)
-        break;
-      }
-    }
-    const leftDiv = document.getElementById("left-div");
-    leftDiv.appendChild(currentFaces[this.current].canvas)
+	
+	if (this.current && currentFaces[this.current]) {
+//		console.log(currentFaces, this.q1);
+		while(this.q1.length > 0){
+			const temp = this.q1.pop();
+			if(temp in currentFaces){
+				console.log(temp, currentFaces);
+				this.current = temp;
+				const leftDiv = document.getElementById("left-div");
+				leftDiv.appendChild(currentFaces[temp].canvas);
+				break;
+			}
+		}
+		const leftDiv = document.getElementById("left-div");
+		leftDiv.appendChild(currentFaces[this.current].canvas)
+	} 
   }
 
   remove(){
@@ -37,8 +38,8 @@ class BannerHandler {
     while (leftDiv.firstChild) {
       leftDiv.removeChild(leftDiv.firstChild);
     } 
-    this.q2.push(current)
-    current = null
+    this.q2.push(this.current);
+    this.current = null;
   }
 }
 
@@ -59,14 +60,12 @@ function getRandomLetter(){
   return letters[getRandomInt(0,25)]
 }
 
-const later = (delay, value) =>
-    new Promise(resolve => setTimeout(resolve, delay, value));
+const later = (faceLabels) => {
+	return new Promise(resolve => { 
+		resolve(faceLabels);
+	});
+};
 
-
-$(document).ready(function() {
-    run()
-  })
-      
   async function run() {
     // load the models
     await faceapi.loadTinyFaceDetectorModel(MODELS_PATH)
@@ -108,6 +107,9 @@ $(document).ready(function() {
                 
                 const regionsToExtract = detections.map(faceDetection=> faceDetection.detection.box)
                 faceapi.extractFaces(input, regionsToExtract).then(canvases=>{
+				canvases.forEach((c)=> { 
+					c.style='position:absolute;left:0;top:0;width:200px;height:200px;';
+				});
                 const faces = names.reduce((o, name, i) => (
                     { ...o, [name]: 
                       {
@@ -115,7 +117,7 @@ $(document).ready(function() {
                         "match": matches[i],
                         "canvas": canvases[i]
                       }}
-                    ), {})
+                    ), {});
                 
                     faceLabels = [ 
                       ...faceLabels, 
@@ -141,7 +143,7 @@ $(document).ready(function() {
             }
           })
     })
-    .then((arr)=>later(3000, arr))
+    .then((faceLabels)=>later(faceLabels))
     .then((arr)=>detect(arr))
   }
   
@@ -150,3 +152,5 @@ async function onPlay(videoEl) {
 }
 
 window.onPlay = onPlay
+
+run();
