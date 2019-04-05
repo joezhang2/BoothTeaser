@@ -3,6 +3,23 @@ const MODELS_PATH = '/public/models';
 const lastNames = ['SMITH','JOHNSON','WILLIAMS','BROWN','JONES','MILLER','DAVIS','GARCIA','RODRIGUEZ','WILSON','MARTINEZ','ANDERSON','TAYLOR','THOMAS','HERNANDEZ','MOORE','MARTIN','JACKSON','THOMPSON','WHITE','LOPEZ','LEE','GONZALEZ','HARRIS','CLARK','LEWIS','ROBINSON','WALKER','PEREZ','HALL','YOUNG','ALLEN','SANCHEZ','WRIGHT','KING','SCOTT','GREEN','BAKER','ADAMS','NELSON','HILL','RAMIREZ','CAMPBELL','MITCHELL','ROBERTS','CARTER','PHILLIPS','EVANS','TURNER','TORRES','PARKER','COLLINS','EDWARDS','STEWART','FLORES','MORRIS','NGUYEN','MURPHY','RIVERA','COOK','ROGERS','MORGAN','PETERSON','COOPER','REED','BAILEY','BELL','GOMEZ','KELLY','HOWARD','WARD','COX','DIAZ','RICHARDSON','WOOD','WATSON','BROOKS','BENNETT','GRAY','JAMES','REYES','CRUZ','HUGHES','PRICE','MYERS','LONG','FOSTER','SANDERS','ROSS','MORALES','POWELL','SULLIVAN','RUSSELL','ORTIZ','JENKINS','GUTIERREZ','PERRY','BUTLER','BARNES','FISHER','HENDERSON','COLEMAN','SIMMONS','PATTERSON','JORDAN','REYNOLDS','HAMILTON','GRAHAM','KIM','GONZALES','ALEXANDER','RAMOS','WALLACE','GRIFFIN','WEST','COLE','HAYES','CHAVEZ','GIBSON','BRYANT','ELLIS','STEVENS','MURRAY','FORD','MARSHALL','OWENS','MCDONALD','HARRISON','RUIZ','KENNEDY','WELLS','ALVAREZ','WOODS','MENDOZA','CASTILLO','OLSON','WEBB','WASHINGTON','TUCKER','FREEMAN','BURNS','HENRY','VASQUEZ','SNYDER','SIMPSON','CRAWFORD','JIMENEZ','PORTER','MASON','SHAW','GORDON','WAGNER','HUNTER','ROMERO','HICKS','DIXON','HUNT','PALMER','ROBERTSON','BLACK','HOLMES','STONE','MEYER','BOYD','MILLS','WARREN','FOX','ROSE','RICE','MORENO','SCHMIDT','PATEL','FERGUSON','NICHOLS','HERRERA','MEDINA','RYAN','FERNANDEZ','WEAVER','DANIELS','STEPHENS','GARDNER','PAYNE','KELLEY','DUNN','PIERCE','ARNOLD','TRAN','SPENCER','PETERS','HAWKINS','GRANT','HANSEN','CASTRO','HOFFMAN','HART','ELLIOTT','CUNNINGHAM','KNIGHT'];
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+let videoEl = document.createElement('video');
+videoEl.setAttribute('autoplay', 'autoplay');
+videoEl.setAttribute('muted', 'muted');
+videoEl.setAttribute('style','position:absolute; top:0;left:0; width:1000px;height: 1000px; z-index: 100');
+videoEl.addEventListener('seeked', (evt) => {
+	console.log(evt);
+	detect([]);
+});
+document.body.appendChild(videoEl);
+
+// try to access users webcam and stream the images
+// to the video element
+navigator.getUserMedia({ video: {} },
+	stream => { console.log('hello stream'); videoEl.srcObject = stream; },
+	err => console.error(err)
+);
+  
 class BannerHandler {
   constructor() {
       this.q1 = [];
@@ -71,21 +88,11 @@ const later = (faceLabels) => {
     await faceapi.loadTinyFaceDetectorModel(MODELS_PATH)
     await faceapi.loadFaceRecognitionModel(MODELS_PATH)
     await faceapi.loadFaceLandmarkTinyModel(MODELS_PATH)
-
-    
-    // try to access users webcam and stream the images
-    // to the video element
-    const videoEl = document.getElementById('inputVideo')
-    navigator.getUserMedia(
-      { video: {} },
-      stream => videoEl.srcObject = stream,
-      err => console.error(err)
-    )
   }
 
   
   function detect(faceLabels){
-      const input = document.getElementById('inputVideo')
+      const input = videoEl;
       return new Promise((resolve,reject)=>{
         faceapi.detectAllFaces(input, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks(true)
@@ -142,9 +149,9 @@ const later = (faceLabels) => {
               resolve(faceLabels)
             }
           })
-    })
-    .then((faceLabels)=>later(faceLabels))
-    .then((arr)=>detect(arr))
+    });
+    // .then((faceLabels)=>later(faceLabels))
+    // .then((arr)=>detect(arr))
   }
   
 async function onPlay(videoEl) {  
