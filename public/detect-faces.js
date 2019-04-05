@@ -4,9 +4,78 @@ const lastNames = ['SMITH','JOHNSON','WILLIAMS','BROWN','JONES','MILLER','DAVIS'
 const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 let faceLabels = [];
+class Person {
+	constructor(face, name) {
+		this.faces = [face];
+		this.name = name;
+	}
+}
 
-const faceDetection = () => {
-	var video = document.createElement('video');
+class BannerHandler {
+	constructor(bannerContainer) {
+		this.dom = bannerContainer;
+		this.current = null;
+		this.persons = [];
+	}
+
+	updateCanvases(currentFaces){
+
+		let facesInView = [];
+
+		for (let name in currentFaces) {
+			facesInView.push(name);
+			let face = currentFaces[name].canvas;
+
+			var currentPerson = this.persons.find((person) => {
+				return person.name === name;
+			});
+	
+			if (!currentPerson) {
+				this.persons.push(new Person(face, name));
+				let divDom = document.createElement('div');
+				divDom.setAttribute('class', 'info-box');
+				divDom.setAttribute('data-name', name);
+				divDom.appendChild(face);
+				this.dom.appendChild(divDom);
+			} else {
+				let divDom = document.querySelector('div.info-box[data-name='+name+']');
+				divDom.innerHTML = '';
+				divDom.appendChild(face);
+				divDom.style.display = 'block';
+			}
+		}
+
+		// Check for displayed faces and if they're not in the cameras view, hide them
+		document.querySelectorAll('.info-box').forEach((el) => {
+			let isFaceInView = !!facesInView.find((name) => {
+				return name === el.getAttribute('data-name')
+			});
+			if (!isFaceInView) {
+				el.style.display = 'none';
+			}
+		});
+
+	}
+
+}
+
+function getRandomInt(min, max) {
+	min = Math.ceil(min);
+	max = Math.floor(max);
+	return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function getRandomName(){
+	return lastNames[getRandomInt(0,198)]
+}
+
+async function run() {
+	// load the models
+	await faceapi.loadTinyFaceDetectorModel(MODELS_PATH);
+	await faceapi.loadFaceRecognitionModel(MODELS_PATH);
+	await faceapi.loadFaceLandmarkTinyModel(MODELS_PATH);
+
+	const video = document.createElement('video');
 
 	video.addEventListener('timeupdate', (evt) => {
 		// send in the video on each frame of video received
@@ -43,128 +112,77 @@ const faceDetection = () => {
 	.catch(function(err) {
 		console.log('An error occurred: ', err);
 	});
-};
-
-class BannerHandler {
-	constructor() {
-			this.q1 = [];
-			this.q2 = [];
-			this.current = null;
-	}
-
-	submit(name){
-		this.q1.push(name)
-	}
-
-	updateCanvases(currentFaces){
-		if (this.current && currentFaces[this.current]) {
-	//		console.log(currentFaces, this.q1);
-			while(this.q1.length > 0){
-				const temp = this.q1.pop();
-				if(temp in currentFaces){
-					console.log(temp, currentFaces);
-					this.current = temp;
-					const leftDiv = document.getElementById('left-div');
-					leftDiv.appendChild(currentFaces[temp].canvas);
-					break;
-				}
-			}
-			const leftDiv = document.getElementById('left-div');
-			leftDiv.appendChild(currentFaces[this.current].canvas)
-		} 
-	}
-
-	remove(){
-		const leftDiv = document.getElementById('left-div');
-		while (leftDiv.firstChild) {
-			leftDiv.removeChild(leftDiv.firstChild);
-		} 
-		this.q2.push(this.current);
-		this.current = null;
-	}
-}
-
-const bh = new BannerHandler();
-
-
-
-function getRandomInt(min, max) {
-	min = Math.ceil(min);
-	max = Math.floor(max);
-	return Math.floor(Math.random() * (max - min)) + min;
-}
-
-function getRandomName(){
-	return lastNames[getRandomInt(0,198)]
-}
-
-async function run() {
-	// load the models
-	await faceapi.loadTinyFaceDetectorModel(MODELS_PATH);
-	await faceapi.loadFaceRecognitionModel(MODELS_PATH);
-	await faceapi.loadFaceLandmarkTinyModel(MODELS_PATH);
-
-	faceDetection();
 }
 
 function detect(video){
-	return new Promise((resolve,reject)=>{
+	return new Promise((resolve,reject) => {
 		faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
 		.withFaceLandmarks(true)
 		.withFaceDescriptors()
-		.then(detections=>{
-			if(detections.length>0){
-				if(faceLabels.length===0){
+		.then(detections => {
+			// found something
+			if(detections.length > 0){
+				// don't know who
+				if(faceLabels.length === 0) {
 					faceLabels = [ 
 						...faceLabels, 
 						...detections.map(detection=> new faceapi.LabeledFaceDescriptors(
 							getRandomName(),
 							[detection.descriptor])
-					)]
-					resolve(faceLabels)
+					)];
+					resolve(faceLabels);
+				// probably know them
 				} else {
 					const faceMatcher = new faceapi.FaceMatcher(faceLabels);
-					const matches = detections.map(d=>faceMatcher.matchDescriptor(d.descriptor))
-					const names = matches.map(m => m.distance>0.6 ? getRandomName() : m.label )
+					const matches = detections.map(d => faceMatcher.matchDescriptor(d.descriptor));
+					const names = matches.map(m => m.distance > 0.6 ? getRandomName() : m.label);
 					
-					const regionsToExtract = detections.map(faceDetection=> faceDetection.detection.box)
-					faceapi.extractFaces(video, regionsToExtract).then(canvases=>{
-					canvases.forEach((c)=> { 
-						c.style='position:absolute;left:0;top:0;width:200px;height:200px;';
-					});
-					const faces = names.reduce((o, name, i) => (
-							{ ...o, [name]: 
-								{
+					const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
+
+					// who's in the picture?
+					faceapi.extractFaces(video, regionsToExtract).then(canvases => {
+
+						console.log(canvases);
+						canvases.forEach((c)=> { 
+//							c.style='position:absolute;left:0;top:0;width:200px;height:200px;';
+						});
+
+						const faces = names.reduce((o, name, i) => { 
+							return { 
+								...o, [name]: {
 									'detection': detections[i],
 									'match': matches[i],
 									'canvas': canvases[i]
-								}}
-							), {});
+								}
+							};
+						}, {});
 					
-							faceLabels = [ 
-								...faceLabels, 
-								...names.filter((name,i)=>{
-										return faces[name].match.distance>0.6
-									})
-									.map((name)=> {
-										bh.submit(name);
-										return new faceapi.LabeledFaceDescriptors(
-											name,
-											[faces[name].detection.descriptor]
-										)
-									})
-							]
+						faceLabels = [ 
+							...faceLabels, 
+							...names.filter((name,i)=>{
+								return faces[name].match.distance>0.6
+							})
+							.map((name)=> {
+								return new faceapi.LabeledFaceDescriptors(
+									name,
+									[faces[name].detection.descriptor]
+								)
+							})
+						];
+						
+						console.log(faces);
 						bh.updateCanvases(faces);
-						console.log(bh.q1, faces)
-						resolve(faceLabels)
+						resolve(faceLabels);
 					})
 				}
 			} else {
-				console.log('No matches')
-				resolve(faceLabels)
+				console.log('No matches');
+				resolve(faceLabels);
 			}
 		});
 	});
 }
+
+const bh = new BannerHandler(document.querySelector('.main-container'));
 
 run();
