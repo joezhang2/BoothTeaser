@@ -10,7 +10,9 @@ var boxRotationDims = {
 };
 var pageCenterDims = {
 	x: 0,
-	y: 0
+	y: 0,
+	width: 0,
+	height: 0
 };
 var cameraOriginDims = {
 	x: 0,
@@ -32,55 +34,51 @@ function init() {
 	scene = new THREE.Scene();
 
 	scene.matrixAutoUpdate = false;
+	
+	var fogColor = new THREE.Color(0x000000);
+	scene.background = fogColor;
+	scene.fog = new THREE.Fog(fogColor, 10, 60);	
 
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-	camera = new THREE.PerspectiveCamera(30, aspect, 0.01, 200);
+	camera = new THREE.PerspectiveCamera(50, aspect, 10, 70); // 40
 
 	camera.matrixAutoUpdate = false;
 
+	/*
 	helper = new THREE.CameraHelper(camera);
-	
-/*	
-	var fogColor = new THREE.Color(0x000);
-	scene.background = fogColor;
-	scene.fog = new THREE.Fog(fogColor, 50, 175);
-*/	
-	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-	camera = new THREE.PerspectiveCamera(70, aspect, 10, 50);
-	
-	
-	//  scene.add(helper);
-	
+	scene.add(helper);
+		
 	// show me x/y/z grids
+	
 	var size = 20;
 	var divisions = 20;
-	/*
+
 	var xGridHelper = new THREE.GridHelper(size, divisions);
 	xGridHelper.position.x = 0;
 	xGridHelper.position.y = 0;
 	xGridHelper.position.z = 0;
 	xGridHelper.rotation.x = rads(90);
-	//  scene.add(xGridHelper);
+	scene.add(xGridHelper);
 	
 	var yGridHelper = new THREE.GridHelper(size, divisions);
 	yGridHelper.position.x = 0;
 	yGridHelper.position.y = 0;
 	yGridHelper.position.z = 0;
 	yGridHelper.rotation.y = rads(90);
-	//  scene.add(yGridHelper);
+	scene.add(yGridHelper);
 	
 	var polarGridHelper = new THREE.PolarGridHelper(size, divisions, 8, 64, 0x0000ff, 0x808080);
 	polarGridHelper.position.y = 0;
 	polarGridHelper.position.x = 0;
 	polarGridHelper.position.z = 0;
 	polarGridHelper.rotation.z = rads(90);
-	// scene.add(polarGridHelper);
+	scene.add(polarGridHelper);
 	*/
 	drawLetters(scene);
 	
 	// WebGL 2 looks to be supported in Chrome and FF, but not in Safari Tech Preview very well.
 	canvas = document.createElement('canvas');
-	canvas.style.background = '#000';
+	canvas.style.background = '#000000';
 	context = canvas.getContext('webgl2'); // webgl2 for that engine
 	renderer = new THREE.WebGLRenderer({
 		canvas: canvas,
@@ -103,32 +101,40 @@ var bucketAngleSize = 360 / totalBuckets;
 
 function assignToBucket (mesh) {
 	var p1 = { x:0, y:0},
-			p2 = { x: mesh.position.y, y: mesh.position.z };
+		p2 = { x: mesh.position.y, y: mesh.position.z };
 	
 	// angle in radians
-	var angleRads = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+//	var angleRads = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 	
-	// angle in degrees
-	var angleDeg = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+	// angle in degrees to get to letter point
+	var angleToLetterDeg = (Math.atan2(p2.x - p1.x, p2.y - p1.y) * 180 / Math.PI);
 	
-	var bucketSlice = Math.floor(angleDeg / bucketAngleSize);
-	var bucketAngle = bucketSlice * bucketAngleSize;
-	
-	// console.log(angleDeg, angleRads, bucketSlice, bucketAngle, p2.x, p2.y);
+	// number of times the bucket angle size goes into the angle to the letter
+	var bucketSlice = Math.floor(angleToLetterDeg / bucketAngleSize);
+	// put the letter in a bucket lesser than the next angle
+	// var bucketAngle = (bucketSlice * bucketAngleSize) + 180;
+
+	var bucketAngle = (bucketSlice * bucketAngleSize);
+	bucketAngle = bucketAngle < 0 ? bucketAngle + 360 : bucketAngle;
+
 	if (!meshBuckets[bucketAngle]) {
 		meshBuckets[bucketAngle] = [];
 	}
-	// console.log(meshBuckets[bucketAngle]);
 	meshBuckets[bucketAngle].push(mesh);
 }
 
-document.body.addEventListener('mousemove', onMouseMove);
-document.body.addEventListener('onresize', onWinResize);
-onWinResize();
+var resizeThrottle;
 
 function onWinResize() {
-	pageCenterDims.width = window.innerWidth / 2;
-	pageCenterDims.height = window.innerHeight / 2;
+	if(resizeThrottle) clearTimeout(resizeThrottle);
+	resizeThrottle = setTimeout(()=>{
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+	
+		pageCenterDims.width = window.innerWidth / 2;
+		pageCenterDims.height = window.innerHeight / 2;
+	}, 100);
 }
 
 function onMouseMove(e) {
@@ -140,28 +146,112 @@ var angle = 0;
 
 function render () {
 	
-	angle += 0.1;
+	angle = (angle + 0.1) % 360;
 	
+//	let rotation = rads(angle + 270);
+	hideCulledMeshes();
+
 	camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1);
 	camera.position.y = cameraHoverDistance * Math.cos(rads(angle));
 	camera.position.z = cameraHoverDistance * Math.sin(rads(angle));
-// camera.position.set(
-// 		cameraOriginDims.x + (boxRotationDims.x * -1),
-// 		cameraHoverDistance * Math.cos(rads(angle)),
-// 		cameraHoverDistance * Math.cos(rads(angle))
-// 	);
-	
 	camera.rotation.x = rads(angle + 270);
-	
+	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.03;
 	camera.updateMatrix();
+
+	// Scenes 
+	scene.matrixWorldNeedsUpdate = false;
 
 	renderer.render(scene, camera);
 };
 
+/*
+	// Calculate the rotation angle of the camera
+	let origin = { x:0, y:0 },
+		cameraPos = { x: camera.position.y, y: camera.position.z },
+		angleRads = Math.atan2(cameraPos.y - origin.y, cameraPos.x - origin.x); //  * 180 / Math.PI
+
+	if (angleRads > 2*Math.PI) {
+		angleRads = angleRads % (2*Math.PI);
+	}
+
+	// calculate the 
+	let minAngle = angleRads + (Math.PI/2), // angleDeg - 90,
+		maxAngle = angleRads - (Math.PI/2); // angleDeg + 90;
+	
+	if (minAngle > 2*Math.PI) { minAngle = minAngle % (2*Math.PI); }
+	if (maxAngle > 2*Math.PI) { maxAngle = maxAngle % (2*Math.PI); }
+*/
+
+function isInView(bucketAngle, angleDeg) {
+	var min, max;
+
+	if(angleDeg < 90) {
+		min = (angleDeg + 360) - 90;
+		max = angleDeg + 90;
+		return (bucketAngle < max) || // if 1 then buckets less than 91 are in view
+			(bucketAngle > min) // if 1 then buckets greater than 271 are in view
+	} else if (angleDeg > 270) {
+		min = angleDeg - 90;
+		max = ((angleDeg + 360) + 90) % 360;
+		return (bucketAngle < max) || // if 271 then buckets less than 1 are in view
+			(bucketAngle > min) // if 271 then buckets greater than 181 are in view
+	} else {
+		min = angleDeg - 90;
+		max = angleDeg + 90;
+		return (bucketAngle <= max) && // if 180 then buckets less than 270 are in view
+			(bucketAngle >= min) // if 180 then buckets greater than 90 are in view
+	}
+}
+
+
+function hideCulledMeshes () {
+	// Calculate the rotation angle of the camera
+	var origin = { x:0, y:0 },
+		cameraPos = { x: camera.position.y, y: camera.position.z };
+	var angleDeg = (Math.atan2(cameraPos.x - origin.x, cameraPos.y - origin.y) * 180 / Math.PI);
+
+	// atan returns -179 through -0.001 beyond 180 degress, so add 360 to give us the positive angles rather than a negative bucket angle
+	angleDeg = angleDeg < 0 ? angleDeg + 360 : angleDeg;
+
+	if (!meshBuckets || !Object.keys(meshBuckets) || Object.keys(meshBuckets).length === 0) { return; }
+
+	for(let sliceAngle in meshBuckets) {
+//		console.log(sliceAngle);
+		if (!isInView(+sliceAngle, angleDeg)) {
+			meshBuckets[sliceAngle].forEach((mesh)=>{
+				mesh.visible = false;
+				mesh.matrixWorldNeedsUpdate = false;
+			}) 
+		} else {
+			meshBuckets[sliceAngle].forEach((mesh)=>{
+				mesh.visible = true;
+				mesh.matrixWorldNeedsUpdate = true;
+			}) 
+		}
+	}
+
+// 	var activeSlice = Math.floor( angleDeg / bucketAngleSize) * bucketAngleSize;
+
+
+// 	// only update one bucket right now, just to see something render with new buckets.
+// 	if (meshBuckets[ activeSlice ] && meshBuckets[ activeSlice ].length > 0) {
+
+// 		// this was changing the angle of the meshes in view at the 0 y axis (traditional graph not scene geo), 
+// 		// but we need make visible the > +90 degree and disapear the > -91 degree slice so it adds them and subtracts them as needed
+
+// 		meshBuckets[ activeSlice ].forEach((mesh) => {
+// //			mesh.rotation.x = rotation;
+// 		});
+
+// 		console.log( 'slice size', meshBuckets[ activeSlice ].length );
+// 	} else {
+// 		console.log('Empty slice', activeSlice, meshBuckets[ activeSlice ], rotation, angleDeg, bucketAngleSize);
+// 	}
+}
+
 function animate() {
 	requestAnimationFrame(animate);
 	render();
-//	setTimeout(render, 0);
 }
 
 function perc2color(perc, min, max) {
@@ -276,7 +366,7 @@ function generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius
 		var startingAngle = 2 * Math.PI * minArcLength / circumference;
 		var endingAngle = 2 * Math.PI * maxArcLength / circumference;
 		
-		return .3 * Math.random() * (endingAngle - startingAngle) + startingAngle;
+		return .6 * Math.random() * (endingAngle - startingAngle) + startingAngle;
 	}
 	
 	function generateRandomPointOnArc(currentRadius, minArcLength, maxArcLength, arcRadius) {
@@ -290,11 +380,11 @@ function generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius
 	
 	function generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance) {
 		var x, y, z;
-		var radius = minRadius + (maxRadius - minRadius) * Math.random();
+		var radius = minRadius + (maxRadius - minRadius) * Math.random() * .6;
 		
 		var pointOnArc = generateRandomPointOnArc(radius, currentMinArc, currentMaxArc, minRadius);
 		
-		x = (widthVariance ? widthOffset * .3 * Math.random() : 0)+ leftWidthBoundary;
+		x = (widthVariance ? widthOffset * .6 * Math.random() : 0)+ leftWidthBoundary;
 		y = pointOnArc.y;
 		z = pointOnArc.z;
 		return {x: x, y: y, z: z};
@@ -376,12 +466,23 @@ function angleLetter(pos) {
 function createMaterial (color) {
 	var color = new THREE.Color(color); //0x006600;
 	// console.log(perc, color);
+
 	return new THREE.MeshBasicMaterial({
 		color: color,
 		transparent: true,
-		opacity: 0.6 //Math.round(minMaxRand(0.3, 1) * 10).toFixed(2) 
+		side: THREE.FrontSide
+
+// None of the options below significantly improved rendering performance		
+//		reflectivity: 0,
+//		depthWrite: false,
+//		depthTest: false,
+//		refractionRatio: 1, 
+//		aoMapIntensity: 0, // oclussion effect
+//		precision: 'lowp' // highp", "mediump" or "lowp"
+//		opacity:  //Math.round(minMaxRand(0.3, 1) * 10).toFixed(2) 
 		// ,side: THREE.DoubleSide
 	});
+
 }
 
 
@@ -400,21 +501,21 @@ function drawLetters(scene) {
 		// var density = .3;
 		// var points = generateCylinder(centerPoint, edgePoint, density, height, heightIncrements);
 		
-		var xPosition = -45; // 20
-		var maxWidth = 90; // 30
+		var maxWidth = 80; // 30
+		var xPosition = (maxWidth / 2) * -1; // 20
 		var numWidthIncrement = 40; // 15
 		var maxRadius = 50; // 47
-		var minRadius = 30; // 46
-		var numRadiusIncrements = 5; // .2
-		var fontSize = .4;
+		var minRadius = 20; // 46
+		var numRadiusIncrements = 10; // .2
+		var fontSize = .3;
 		var points = generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements);
 		
 		console.log('Total objects in universe:', points.length);
 		var midway = maxWidth/2 + xPosition;
 
-		var leftMat = createMaterial(0xFF6600),
-			centerMat = createMaterial(0x999999),
-			rightMat = createMaterial(0x0066FF);
+		var leftMat = createMaterial(0xFF7722),
+			centerMat = createMaterial(0x111111),
+			rightMat = createMaterial(0x2277FF);
 
 		// noinspection BadExpressionStatementJS
 
@@ -430,39 +531,54 @@ function drawLetters(scene) {
 		}
 
 		points.forEach((pos) => {
-			let curMesh;
+			let curMat;
+			let yRot = 0;
 			if (pos.x < midway - 20){
-				curMesh = leftMat;
+				curMat = leftMat;
+				yRot = 1;
 			} else if (pos.x > midway + 20) {
-				curMesh = rightMat;
+				curMat = rightMat;
+				yRot = -1;
 			} else {
-				curMesh = centerMat;
+				curMat = centerMat;
 			}
 
 			let letterPos = Math.floor(Math.random() * possible.length);
 
-			let mesh = new THREE.Mesh(fontShapes[letterPos], curMesh);
-
+			let mesh = new THREE.Mesh(fontShapes[letterPos], curMat);
 			mesh.position.x = pos.x;
 			mesh.position.y = pos.y;
 			mesh.position.z = pos.z;
 			
 			mesh.rotation.x = angleLetter(mesh.position);
+			mesh.rotation.y = mesh.rotation.y + yRot;
+
+//			mesh.visible = false;
 
 			// do update after properties are set as part of startup process
 			mesh.updateMatrix();
+			
 			// don't auto update every frame for this mesh
 			mesh.matrixAutoUpdate = false;
 			
+			// try to save some cycles in calculating what to show and hide by doing this ourselves using in view mesh buckets
+			// mesh.frustumCulled = false; // this worked horribly. Double the render object calls. 
+
 			scene.add(mesh);
 			assignToBucket(mesh);
 
 		});
-		
+
 	}); //end load function
 	
 }
 
 init();
+
+onWinResize();
+
 render();
 requestAnimationFrame(animate);
+
+document.body.addEventListener('mousemove', onMouseMove);
+window.addEventListener('resize', onWinResize);
