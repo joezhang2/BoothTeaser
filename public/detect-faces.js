@@ -36,11 +36,17 @@ class BannerHandler {
 				divDom.setAttribute('class', 'info-box');
 				divDom.setAttribute('data-name', name);
 				divDom.appendChild(face);
+				let label = document.createElement('div');
+				label.innerHTML = 'Name: '+ name;
+				divDom.appendChild(label);
 				this.dom.appendChild(divDom);
 			} else {
 				let divDom = document.querySelector('div.info-box[data-name='+name+']');
 				divDom.innerHTML = '';
 				divDom.appendChild(face);
+				let label = document.createElement('div');
+				label.innerHTML = 'Name: '+ name;
+				divDom.appendChild(label);
 				divDom.style.display = 'block';
 			}
 		}
