@@ -17,10 +17,15 @@ class BannerHandler {
   }
 
   updateCanvases(currentFaces){
-    while(q1.length > 0){
-      const temp = q1.pop();
+    console.log(currentFaces, this.q1)
+    while(this.q1.length > 0){
+      const temp = this.q1.pop();
       if(temp in currentFaces){
+        console.log(temp, currentFaces)
         this.current = temp
+        const leftDiv = document.getElementById("left-div");
+        leftDiv.appendChild(currentFaces[temp].canvas)
+        break;
       }
     }
     const leftDiv = document.getElementById("left-div");
@@ -125,7 +130,7 @@ $(document).ready(function() {
                           )
                         })
                     ]
-                  
+                  bh.updateCanvases(faces);
                   console.log(bh.q1, faces)
                   resolve(faceLabels)
                 })
