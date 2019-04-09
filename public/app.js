@@ -31,7 +31,7 @@ var meshBuckets = {};
 const totalBuckets = 360;
 const bucketAngleSize = 360 / totalBuckets;
 
-const cameraHoverDistance = 100;
+const cameraHoverDistance = 70;
 
 const minMaxRand = (min, max) => {
 	return Math.random() * (max - min) + min;
@@ -69,10 +69,10 @@ const init = () => {
 	
 	const fogColor = new THREE.Color(0x000000);
 	scene.background = fogColor;
-	scene.fog = new THREE.Fog(fogColor, 10, 100);	
+	scene.fog = new THREE.Fog(fogColor, 10, 70);	
 
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-	camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 100); // 40
+	camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 70); // 40
 
 	camera.matrixAutoUpdate = false;
 
@@ -178,7 +178,7 @@ const render = () => {
 	// textBlock.rotation.z = camera.rotation.y * 0.9;
 
 	// Scenes 
-//	scene.matrixWorldNeedsUpdate = false;
+	scene.matrixWorldNeedsUpdate = false;
 
 	renderer.render(scene, camera);
 };
@@ -276,9 +276,9 @@ const angleLetter = (pos) => {
 
 const createMaterial = (color) => {
 	return new THREE.MeshBasicMaterial({
-//		color: new THREE.Color(color),
-		transparent: true
-//		side: THREE.FrontSide //FrontSide
+		color: new THREE.Color(color),
+		transparent: true,
+		side: THREE.FrontSide
 // None of the options below significantly improved rendering performance		
 //		reflectivity: 0,
 //		depthWrite: false,
@@ -370,7 +370,7 @@ const assignToBucket = (mesh) => {
 const drawLetters = (scene) => {
 	const loader = new THREE.FontLoader();
 	
-	//loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+	loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
 		
 		const maxWidth = 80,
 			xPosition = (maxWidth / 2) * -1,
@@ -381,93 +381,67 @@ const drawLetters = (scene) => {
 			fontSize = .3,
 			points = generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements),
 			midway = maxWidth/2 + xPosition,
-			// leftMat = createMaterial(0xFF7722),
-			// centerMat = createMaterial(0x111111),
-			// rightMat = createMaterial(0x2277FF),
 			possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-		const letterWidth = 1,
-			letterHeight = 1;
-
-		let letterMats = [];
+		let letterShapeGeoms = [];
 		console.log('Total objects in universe:', points.length);
 
 		for (let i = 0; possible.length > i; i++) {
-			letterMats[i] = new THREE.MeshBasicMaterial({
-//				color: 0xffffbb,
-				transparent: true,
-//				side: THREE.DoubleSide,
-				map: new THREE.TextTexture({
-					fontFamily: 'Helvetica, Arial, sans-serif',
-					fontSize: 128,
-					fontStyle: 'italic',
-					text: possible[i]
-				})
-			});
+			let geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
+			geometry.computeBoundingBox();
+			geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
+			letterShapeGeoms[i] = geometry;
 		}
 
-		let geometry = new THREE.PlaneBufferGeometry( letterWidth, letterHeight, 1, 1 );
-		let geometries = [];
-		let matrix = new THREE.Matrix4();
+		let geometries = {};
 
 		points.forEach((pos) => {
-			// let curMat;
-			// let yRot = 0;
-			// if (pos.x < midway - 20){
-			// 	curMat = leftMat;
-			// 	yRot = 1;
-			// } else if (pos.x > midway + 20) {
-			// 	curMat = rightMat;
-			// 	yRot = -1;
-			// } else {
-			// 	curMat = centerMat;
-			// }
+			let rotY;
+			if (pos.x < midway - 20){
+				rotY = 1;
+			} else if (pos.x > midway + 20) {
+				rotY = -1;
+			} else {
+				rotY = 0;
+			}
 
 			let letterPos = Math.floor(Math.random() * possible.length);
 
-//			let letterImage = letterSpriteMats[letterPos].map.image;
-//			let plane = new THREE.Mesh( geometry, letterSpriteMats[letterPos] );
+			if (!geometries[rotY]) { geometries[rotY] = {}; }
+			if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
 
-			if (!geometries[letterPos]) geometries[letterPos] = [];
-
-			let newGeom = new THREE.PlaneBufferGeometry( letterWidth, letterHeight, 1, 1 );
-
-			// plane.scale.setX(letterImage.width / letterImage.height).multiplyScalar(1);
+			let newGeom = letterShapeGeoms[letterPos].clone();
 
 			newGeom.translate( pos.x, pos.y, pos.z );
-			newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * Math.PI/2); // 
+			newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * Math.PI/2);
 //			newGeom.rotateY();
 			// plane.rotation.x = angleLetter(pos);
-			// plane.rotation.y = plane.rotation.y + yRot;
+			// plane.rotation.y = plane.rotation.y + rotY;
 
-			geometries[letterPos].push(newGeom);
-
-			// assignToBucket(plane);
-
-			// do update after properties are set as part of startup process
-			// plane.updateMatrix();
-			
-			// don't auto update every frame for this mesh
-			// plane.matrixAutoUpdate = false;
-			
-			// try to save some cycles in calculating what to show and hide by doing this ourselves using in view mesh buckets
-			// mesh.frustumCulled = false; // this worked horribly. Double the render object calls. 
-			// combinedGeometry.merge(geometry, plane);
+			geometries[rotY][letterPos].push(newGeom);
 		});
 
-		geometries.forEach((geoms, index) => {
-			let mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), letterMats[index] );
-			mesh.updateMatrix();
-			let letterImage = letterMats[index].map.image;
-			// mesh.rotation.x = mesh.rotation.x;
-			// mesh.rotation.y = mesh.rotation.y;
-			mesh.scale.setX(letterImage.width / letterImage.height).multiplyScalar(1);
-			
-			scene.add(mesh);
-			
-		});
+		const colors = {
+			'-1': createMaterial(0xFF7722),
+			'0': createMaterial(0x333333),
+			'1': createMaterial(0x2277FF)
+		};
 
-	//}); //end load function
+		for(let rotY in geometries) {
+			let letterGroups = geometries[rotY];
+			console.log(rotY);
+			for(let index in letterGroups) {
+				let geoms = letterGroups[index],
+					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
+				mesh.updateMatrix();
+				mesh.matrixAutoUpdate = false;
+				// mesh.rotation.x = mesh.rotation.x;
+				// mesh.rotation.y = mesh.rotation.y;
+				scene.add(mesh);
+			}
+		}
+
+	}); //end load function
 
 //	loadTextFromCanvas2D(scene);
 };
