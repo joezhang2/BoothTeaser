@@ -31,7 +31,7 @@ var meshBuckets = {};
 const totalBuckets = 360;
 const bucketAngleSize = 360 / totalBuckets;
 
-const cameraHoverDistance = 70;
+const cameraHoverDistance = 65;
 
 const minMaxRand = (min, max) => {
 	return Math.random() * (max - min) + min;
@@ -412,8 +412,8 @@ const drawLetters = (scene) => {
 
 			let newGeom = letterShapeGeoms[letterPos].clone();
 
-			newGeom.translate( pos.x, pos.y, pos.z );
 			newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * Math.PI/2);
+			newGeom.translate( pos.x, pos.y, pos.z );
 //			newGeom.rotateY();
 			// plane.rotation.x = angleLetter(pos);
 			// plane.rotation.y = plane.rotation.y + rotY;
@@ -429,7 +429,6 @@ const drawLetters = (scene) => {
 
 		for(let rotY in geometries) {
 			let letterGroups = geometries[rotY];
-			console.log(rotY);
 			for(let index in letterGroups) {
 				let geoms = letterGroups[index],
 					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
