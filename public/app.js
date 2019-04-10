@@ -31,7 +31,7 @@ var meshBuckets = {};
 const totalBuckets = 360;
 const bucketAngleSize = 360 / totalBuckets;
 
-const cameraHoverDistance = 65;
+const cameraHoverDistance = 70;
 
 const minMaxRand = (min, max) => {
 	return Math.random() * (max - min) + min;
@@ -76,8 +76,6 @@ const init = () => {
 
 	camera.matrixAutoUpdate = false;
 
-	drawLetters(scene);
-	
 	// WebGL 2 looks to be supported in Chrome and FF, but not in Safari Tech Preview very well.
 	canvas = document.createElement('canvas');
 	canvas.style.background = '#000000';
@@ -98,58 +96,9 @@ const init = () => {
 	window.addEventListener('resize', onWinResize);
 
 	onWinResize();
-	render();
-	requestAnimationFrame(animate);
-};
 
-
-const isInView = (bucketAngle, angleDeg) => {
-	let min, max;
-
-	if(angleDeg < 90) {
-		min = (angleDeg + 360) - 90;
-		max = angleDeg + 90;
-		return (bucketAngle < max) || // if 1 then buckets less than 91 are in view
-			(bucketAngle > min) // if 1 then buckets greater than 271 are in view
-	} else if (angleDeg > 270) {
-		min = angleDeg - 90;
-		max = ((angleDeg + 360) + 90) % 360;
-		return (bucketAngle < max) || // if 271 then buckets less than 1 are in view
-			(bucketAngle > min) // if 271 then buckets greater than 181 are in view
-	} else {
-		min = angleDeg - 90;
-		max = angleDeg + 90;
-		return (bucketAngle <= max) && // if 180 then buckets less than 270 are in view
-			(bucketAngle >= min) // if 180 then buckets greater than 90 are in view
-	}
-};
-
-
-const hideCulledMeshes = () => {
-	// Calculate the rotation angle of the camera
-	const origin = { x:0, y:0 },
-		cameraPos = { x: camera.position.y, y: camera.position.z };
-
-	let angleDeg = (Math.atan2(cameraPos.x - origin.x, cameraPos.y - origin.y) * 180 / Math.PI);
-
-	// atan returns -179 through -0.001 beyond 180 degress, so add 360 to give us the positive angles rather than a negative bucket angle
-	angleDeg = angleDeg < 0 ? angleDeg + 360 : angleDeg;
-
-	if (!meshBuckets || !Object.keys(meshBuckets) || Object.keys(meshBuckets).length === 0) { return; }
-
-	for(let sliceAngle in meshBuckets) {
-		if (!isInView(+sliceAngle, angleDeg)) {
-			meshBuckets[sliceAngle].forEach((mesh)=>{
-				mesh.visible = false;
-				mesh.matrixWorldNeedsUpdate = false;
-			}) 
-		} else {
-			meshBuckets[sliceAngle].forEach((mesh)=>{
-				mesh.visible = true;
-				mesh.matrixWorldNeedsUpdate = true;
-			}) 
-		}
-	}
+	// yeild the thread so chrome doesn't nerf the raf
+	setTimeout(drawSomething);
 };
 
 var textBlock;
@@ -190,6 +139,8 @@ const animate = () => {
 };
 
 
+const posRandRate = 0.9;
+
 const generatePlantedForest = (xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements) => {
 	
 	const calculateRandomAngleInArc = (minArcLength, maxArcLength, radius) => {
@@ -197,7 +148,7 @@ const generatePlantedForest = (xPosition, maxWidth, numWidthIncrement, maxRadius
 		const startingAngle = 2 * Math.PI * minArcLength / circumference;
 		const endingAngle = 2 * Math.PI * maxArcLength / circumference;
 		
-		return .6 * Math.random() * (endingAngle - startingAngle) + startingAngle;
+		return posRandRate * Math.random() * (endingAngle - startingAngle) + startingAngle;
 	}
 	
 	const generateRandomPointOnArc = (currentRadius, minArcLength, maxArcLength, arcRadius) => {
@@ -211,11 +162,11 @@ const generatePlantedForest = (xPosition, maxWidth, numWidthIncrement, maxRadius
 	
 	const generatePoint = (leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance) => {
 		let x, y, z;
-		const radius = minRadius + (maxRadius - minRadius) * Math.random() * .6;
+		const radius = minRadius + (maxRadius - minRadius) * Math.random() * posRandRate;
 		
 		const pointOnArc = generateRandomPointOnArc(radius, currentMinArc, currentMaxArc, minRadius);
 		
-		x = (widthVariance ? widthOffset * .6 * Math.random() : 0)+ leftWidthBoundary;
+		x = (widthVariance ? widthOffset * posRandRate * Math.random() : 0)+ leftWidthBoundary;
 		y = pointOnArc.y;
 		z = pointOnArc.z;
 		return {x: x, y: y, z: z};
@@ -257,20 +208,18 @@ const generatePlantedForest = (xPosition, maxWidth, numWidthIncrement, maxRadius
 	const endWith = xPosition + maxWidth;
 	
 	let vertices = [];
-	
+	let startTime = Date.now();
 	vertices = vertices.concat(generateDisk(xPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false));
-	
+	console.log('after vertices.concat(generateDisk', Date.now() - startTime);
+
 	for(let currentXPosition = xPosition; currentXPosition < endWith; currentXPosition += widthIncrement) {
 		vertices = vertices.concat(generateDisk(currentXPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, true));
 	}
+	console.log('after for(let currentXPosition', Date.now() - startTime);
 	
 	vertices = vertices.concat(generateDisk(endWith, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false));
+	console.log('after last vertices.concat(generateDisk', Date.now() - startTime);
 	return vertices;
-};
-
-
-const angleLetter = (pos) => {
-	return Math.atan2(pos.z, pos.y) + 3 * Math.PI/2 ;
 };
 
 
@@ -288,11 +237,6 @@ const createMaterial = (color) => {
 //		precision: 'lowp' // highp", "mediump" or "lowp"
 //		opacity:  //Math.round(minMaxRand(0.3, 1) * 10).toFixed(2) 
 	});
-};
-
-
-const loadTextFromJSON = () => {
-
 };
 
 
@@ -316,133 +260,119 @@ const loadTextFromCanvas2D = (scene) => {
 	scene.add(sprite);
 };
 
-class GroupedLetters {
-	constructor(total, centerX, centerY) {
-		this.total = total || 360;
-		this.anglePer = 360 / total;
-		this.center = { x: +centerX, y: +centerY };
-		this.group = {};
-		for (let i = 0; i < total; i++) {
-			this.group[(this.anglePer * i)] = [];
-		}
-	}
+const drawSomething = () => {
 
-	addObject(letter, x, y){
-		// angle in degrees
-		const angleToPoint = (Math.atan2(x - this.center.x, y - this.center.y) * 180 / Math.PI);
-			
-		// number of times the bucket angle size goes into the angle to the letter
-		const bucketSlice = Math.floor(angleToPoint / this.anglePer);
+	const config = { 
+		maxWidth: 80,
+		xPosition: (80 / 2) * -1, // maxwidth / 2 * -1
+		numWidthIncrement: 45,
+		maxRadius: 50,
+		minRadius: 20,
+		numRadiusIncrements: 20
+	};
 
-		// put the letter in a bucket lesser than the next angle
-		let bucketAngle = (bucketSlice * bucketAngleSize);
-		bucketAngle = bucketAngle < 0 ? bucketAngle + 360 : bucketAngle;
-	
-		this.group[bucketAngle].push(letter);
-	}
-}
+	const points = generatePlantedForest(config.xPosition,
+		config.maxWidth, 
+		config.numWidthIncrement, 
+		config.maxRadius, 
+		config.minRadius, 
+		config.numRadiusIncrements);
 
-
-const assignToBucket = (mesh) => {
-	const p1 = { x:0, y:0},
-		p2 = { x: mesh.position.y, y: mesh.position.z };
-	
-	// angle in radians
-//	var angleRads = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-	
-	// angle in degrees to get to letter point
-	const angleToLetterDeg = (Math.atan2(p2.x - p1.x, p2.y - p1.y) * 180 / Math.PI);
-	
-	// number of times the bucket angle size goes into the angle to the letter
-	const bucketSlice = Math.floor(angleToLetterDeg / bucketAngleSize);
-	// put the letter in a bucket lesser than the next angle
-	// var bucketAngle = (bucketSlice * bucketAngleSize) + 180;
-
-	let bucketAngle = (bucketSlice * bucketAngleSize);
-	bucketAngle = bucketAngle < 0 ? bucketAngle + 360 : bucketAngle;
-
-	if (!meshBuckets[bucketAngle]) {
-		meshBuckets[bucketAngle] = [];
-	}
-	meshBuckets[bucketAngle].push(mesh);
-};
-
-const drawLetters = (scene) => {
-	const loader = new THREE.FontLoader();
-	
-	loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
-		
-		const maxWidth = 80,
-			xPosition = (maxWidth / 2) * -1,
-			numWidthIncrement = 40,
-			maxRadius = 50,
-			minRadius = 20,
-			numRadiusIncrements = 10,
-			fontSize = .3,
-			points = generatePlantedForest(xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements),
-			midway = maxWidth/2 + xPosition,
-			possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-
-		let letterShapeGeoms = [];
-		console.log('Total objects in universe:', points.length);
-
-		for (let i = 0; possible.length > i; i++) {
-			let geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
-			geometry.computeBoundingBox();
-			geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
-			letterShapeGeoms[i] = geometry;
-		}
-
-		let geometries = {};
-
-		points.forEach((pos) => {
-			let rotY;
-			if (pos.x < midway - 20){
-				rotY = 1;
-			} else if (pos.x > midway + 20) {
-				rotY = -1;
-			} else {
-				rotY = 0;
-			}
-
-			let letterPos = Math.floor(Math.random() * possible.length);
-
-			if (!geometries[rotY]) { geometries[rotY] = {}; }
-			if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
-
-			let newGeom = letterShapeGeoms[letterPos].clone();
-
-			newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * Math.PI/2);
-			newGeom.translate( pos.x, pos.y, pos.z );
-//			newGeom.rotateY();
-			// plane.rotation.x = angleLetter(pos);
-			// plane.rotation.y = plane.rotation.y + rotY;
-
-			geometries[rotY][letterPos].push(newGeom);
-		});
-
-		const colors = {
-			'-1': createMaterial(0xFF7722),
-			'0': createMaterial(0x333333),
-			'1': createMaterial(0x2277FF)
-		};
-
-		for(let rotY in geometries) {
-			let letterGroups = geometries[rotY];
-			for(let index in letterGroups) {
-				let geoms = letterGroups[index],
-					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
-				mesh.updateMatrix();
-				mesh.matrixAutoUpdate = false;
-				// mesh.rotation.x = mesh.rotation.x;
-				// mesh.rotation.y = mesh.rotation.y;
-				scene.add(mesh);
-			}
-		}
-
-	}); //end load function
-
+	setTimeout(loadFonts, 0, points, config);
 //	loadTextFromCanvas2D(scene);
 };
 
-init();
+const loadFonts = (points, config) => {
+	const loader = new THREE.FontLoader();
+	loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+		setTimeout(drawLetters, 0, font, points, config);
+	}); //end load function
+};
+
+const generateMaterials = (font, cb) => {
+
+	const fontSize = .3,
+		possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+	let letterShapeGeoms = [];
+
+	for (let i = 0; possible.length > i; i++) {
+		let geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
+		geometry.computeBoundingBox();
+		geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
+		letterShapeGeoms[i] = geometry;
+	}
+
+	cb(letterShapeGeoms);
+};
+
+const generateGeometries = (letterShapeGeoms, points, midway) => {
+	let geometries = {};
+
+	points.forEach((pos) => {
+		let rotY;
+		if (pos.x < midway - 20){
+			rotY = 1;
+		} else if (pos.x > midway + 20) {
+			rotY = -1;
+		} else {
+			rotY = 0;
+		}
+
+		let letterPos = Math.floor(Math.random() * letterShapeGeoms.length);
+
+		if (!geometries[rotY]) { geometries[rotY] = {}; }
+		if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
+
+		let newGeom = letterShapeGeoms[letterPos].clone();
+
+		newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * Math.PI/2);
+//		newGeom.rotateY(rotY);
+		// plane.rotation.y = plane.rotation.y + rotY;
+		newGeom.translate( pos.x, pos.y, pos.z );
+
+		geometries[rotY][letterPos].push(newGeom);
+	});
+
+	return geometries;
+}
+
+const addLettersToScene = (geometries) => {
+	const colors = {
+		'-1': createMaterial(0xFF7722),
+		'0': createMaterial(0x333333),
+		'1': createMaterial(0x2277FF)
+	};
+
+	for(let rotY in geometries) {
+		let letterGroups = geometries[rotY];
+		for(let index in letterGroups) {
+			let geoms = letterGroups[index],
+				mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
+			mesh.updateMatrix();
+			mesh.matrixAutoUpdate = false;
+			// mesh.rotation.x = mesh.rotation.x;
+			// mesh.rotation.y = mesh.rotation.y;
+			scene.add(mesh);
+		}
+	}
+	setTimeout(animate, 0);
+};
+
+const drawLetters = (font, points, config) => {
+
+	let startTime = Date.now();
+
+	const midway = config.maxWidth/2 + config.xPosition;
+
+	console.log('Total objects in universe:', points.length);
+
+	setTimeout(generateMaterials, 0, font, (letterShapeGeoms) => {
+		console.log('after generateMaterials', Date.now() - startTime);
+		setTimeout(addLettersToScene, 0, generateGeometries(letterShapeGeoms, points, midway));
+	});
+	
+};
+
+// yeild the thread so chrome doesn't nerf the raf
+setTimeout(init, 0);
