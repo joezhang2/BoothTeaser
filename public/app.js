@@ -31,7 +31,7 @@ var meshBuckets = {};
 const totalBuckets = 360;
 const bucketAngleSize = 360 / totalBuckets;
 
-const cameraHoverDistance = 70;
+const cameraHoverDistance = 75;
 
 const minMaxRand = (min, max) => {
 	return Math.random() * (max - min) + min;
@@ -69,7 +69,7 @@ const init = () => {
 	
 	const fogColor = new THREE.Color(0x000000);
 	scene.background = fogColor;
-	scene.fog = new THREE.Fog(fogColor, 10, 70);	
+	scene.fog = new THREE.Fog(fogColor, 20, 65);	
 
 	// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
 	camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 70); // 40
@@ -113,7 +113,7 @@ const render = () => {
 	// Tilted axis of the camera to the scene
 	camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1);
 	camera.rotation.x = rads(angle + 270);
-	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.03;
+	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.02;
 
 	// Circular orbit around the center of the scene
 	camera.position.y = cameraHoverDistance * Math.cos(rads(angle));
@@ -263,10 +263,10 @@ const loadTextFromCanvas2D = (scene) => {
 const drawSomething = () => {
 
 	const config = { 
-		maxWidth: 80,
-		xPosition: (80 / 2) * -1, // maxwidth / 2 * -1
+		maxWidth: 90,
+		xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
 		numWidthIncrement: 45,
-		maxRadius: 50,
+		maxRadius: 45,
 		minRadius: 20,
 		numRadiusIncrements: 20
 	};
@@ -284,7 +284,7 @@ const drawSomething = () => {
 
 const loadFonts = (points, config) => {
 	const loader = new THREE.FontLoader();
-	loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+	loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', (font) => {
 		setTimeout(drawLetters, 0, font, points, config);
 	}); //end load function
 };
@@ -340,7 +340,7 @@ const generateGeometries = (letterShapeGeoms, points, midway) => {
 const addLettersToScene = (geometries) => {
 	const colors = {
 		'-1': createMaterial(0xFF7722),
-		'0': createMaterial(0x333333),
+		'0': createMaterial(0x222222),
 		'1': createMaterial(0x2277FF)
 	};
 
