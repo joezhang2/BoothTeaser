@@ -2,7 +2,7 @@
 var canvas, context;
 
 // Renderer specifics
-var camera, scene, renderer;
+var camera, scene, renderer, light;
 var THREE = window.THREE || {};
 
 var boxRotationDims = {
@@ -75,10 +75,10 @@ const start3d = () => {
 		
 		const fogColor = new THREE.Color(0x000000);
 		scene.background = fogColor;
-		scene.fog = new THREE.Fog(fogColor, 20, 65);	
+//		scene.fog = new THREE.Fog(fogColor, 20, 65);	
 
 		// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-		camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 70); // 40
+		camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 2000); // 40
 
 //		camera.matrixAutoUpdate = false;
 
@@ -94,7 +94,17 @@ const start3d = () => {
 		
 		renderer.setSize(window.innerWidth, window.innerHeight);
 
-		scene.updateMatrix();
+		// positioning a light above the camera
+		light = new THREE.PointLight(0xFFFFFF, 1);
+		light.position.set(200, 250, 600);
+		light.castShadow = true;
+		light.shadow = new THREE.LightShadow( new THREE.PerspectiveCamera( 50, .5, 200, 2000 ) );
+		light.shadow.bias = - 0.000222;
+		light.shadow.mapSize.width = 1024;
+		light.shadow.mapSize.height = 1024;
+		scene.add(light);
+
+		// scene.updateMatrix();
 
 		document.body.appendChild(renderer.domElement);
 		
@@ -107,32 +117,98 @@ const start3d = () => {
 	});
 };
 
+const cropBounds = (x,y,w,h) => {
+	return {
+		x: x,
+		y: y,
+		width: w,
+		height: h
+	};
+};
+
 var textBlock;
-var adContainer; 
+var adContainer = new THREE.Group(); 
+var videoCrop = cropBounds(0,0,640,480);
+var videoDims = {
+	width: 640,
+	height: 480
+};
+const makeProfile = (name, ss, phoneNumber, interests, bannerImage) => {
+	return {
+		name,
+		ss,
+		phoneNumber,
+		interests,
+		bannerImage
+	};
+};
+var activeProfile = makeProfile('Anon', 'Anon', 'Anon', 'Anon', '');
+var vidMap;
+
+const cropVideo = (map, cropDims, originalBounds) => {
+	// how to crop: https://github.com/mrdoob/three.js/issues/1847
+	map.repeat.x = cropDims.width / originalBounds.width; // (crop size in pixels / texture width in pixels)
+	map.repeat.y = cropDims.height / originalBounds.height;
+	map.offset.x = ( cropDims.x / cropDims.width ) * map.repeat.x; // position x in pixels / crop size in pixels
+	map.offset.y = ( cropDims.y / cropDims.height ) * map.repeat.y;
+};
 
 const drawAdContainer = (video) => {
 	
 	console.log('Generating ad container with live video textures');
-	const geometry = new THREE.PlaneBufferGeometry( 640, 480, 1, 1 );
-	const map = new THREE.VideoTexture(video);
-// image, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy, encoding
+	vidMap = new THREE.VideoTexture(video);
+	videoDims.width = video.videoWidth;
+	videoDims.height = video.videoHeight;
+	videoCrop = cropBounds(0,0,videoDims.width,videoDims.height);
+	cropVideo(vidMap, videoCrop, videoDims);
 
-	const material = new THREE.MeshBasicMaterial({ // Physical
-		map, //new THREE.CanvasTexture( drawingCanvas ), // need a texture here
-		color: 0xFFFFFF
-		// color: new THREE.Color().setHSL( 1.0, 0.5, 0.25 ), 
-		// metalness: 0,
-		// roughness: 0.5,
-		// transparent: true,
-		// opacity: 0.8,
-		// clearCoat: 1.0,
-		// clearCoatRoughness: 1.0,
-		// reflectivity: 1.0,
-		// envMapIntensity: 5,
-		// premultipliedAlpha: true,
-	});
+	const vidMesh = new THREE.Mesh( 
+		new THREE.PlaneBufferGeometry( 2, 2, 1, 1 ), 
+		new THREE.MeshPhysicalMaterial({
+			map: vidMap,
+			transparent: false,
+			opacity: 1,
+			metalness: 0.2,
+			roughness: 0.9,
+			reflectivity: 0.3,
+			clearCoat: 0.5,
+			clearCoatRoughness: 0.5,
+			color: 0xFFFFFF
+		})
+	);
+	vidMesh.position.z = 0.5; // depth
+	vidMesh.position.x = -2.25; // left and right
+	vidMesh.position.y = 0.5; // up and down
 
-	adContainer = new THREE.Mesh( geometry, material );
+	const bgMesh = new THREE.Mesh( 
+		new THREE.PlaneBufferGeometry( 8, 4, 1, 1 ), 
+		new THREE.MeshPhysicalMaterial({ // this should probably be basic
+			color: new THREE.Color(0x2277FF),
+			transparent: true,
+			opacity: 0.1,
+			metalness: 1,
+			roughness: 0.5,
+			reflectivity: 1,
+			clearCoat: 1,
+			clearCoatRoughness: 0.5,
+			side: THREE.FrontSide
+		})
+	);
+
+	const shadowMesh = new THREE.Mesh( 
+		new THREE.PlaneBufferGeometry( 5, 4, 1, 1 ), 
+		new THREE.ShadowMaterial({ // this should probably be basic
+			opacity: 0.9,
+			color: new THREE.Color(0x000000),
+		})
+	);
+	shadowMesh.position.z = 0.2; // depth
+	shadowMesh.receiveShadow = true;
+
+	adContainer.add(vidMesh);
+	adContainer.add(shadowMesh);
+	adContainer.add(bgMesh);
+
 	scene.add( adContainer );
 };
 
@@ -151,7 +227,7 @@ const render = () => {
 	// Circular orbit around the center of the scene
 	camera.position.y = cameraHoverDistance * Math.cos(rads(angle));
 	camera.position.z = cameraHoverDistance * Math.sin(rads(angle));
-	camera.updateMatrix();
+	// camera.updateMatrix();
 
 	// Disatance of text to the camera
 	// textBlock.position.y = camera.position.y * 0.9;
@@ -159,13 +235,24 @@ const render = () => {
 	// textBlock.rotation.y = camera.rotation.x * 0.9;
 	// textBlock.rotation.z = camera.rotation.y * 0.9;
 
-	adContainer.rotation.z = camera.rotation.z;
-	// adContainer.position.y = camera.position.y * 0.5;
-	// adContainer.position.z = camera.position.z * 0.5;
-	// adContainer.rotation.y = camera.rotation.x * 0.5;
+	adContainer.rotation.x = camera.rotation.x;
+	adContainer.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * -0.001;
+
+	adContainer.position.x = camera.position.x * 1.03;
+	adContainer.position.y = camera.position.y * 0.9;
+	adContainer.position.z = camera.position.z * 0.9;
+
+	cropVideo(vidMap, videoCrop, videoDims);
+
+	light.rotation.x = camera.rotation.x;
+	light.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.02;
+
+	light.position.x = camera.position.x * 10;
+	light.position.y = camera.position.y * 1.5;
+	light.position.z = camera.position.z * 1.5;
 
 	// Scenes 
-	scene.matrixWorldNeedsUpdate = false;
+	// scene.matrixWorldNeedsUpdate = false;
 
 	renderer.render(scene, camera);
 };
@@ -388,8 +475,8 @@ const addLettersToScene = (geometries) => {
 			for(let index in letterGroups) {
 				let geoms = letterGroups[index],
 					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
-				mesh.updateMatrix();
-				mesh.matrixAutoUpdate = false;
+				// mesh.updateMatrix();
+				// mesh.matrixAutoUpdate = false;
 				// mesh.rotation.x = mesh.rotation.x;
 				// mesh.rotation.y = mesh.rotation.y;
 				scene.add(mesh);
@@ -597,8 +684,8 @@ async function run() {
 
 	const video = document.createElement('video');
 
-	document.querySelector('.main-container').appendChild(video);
-	video.setAttribute('style', 'position:absolute;transform:scale(0.3);top:0;right:0;');
+//	document.querySelector('.main-container').appendChild(video);
+//	video.setAttribute('style', 'position:absolute;transform:scale(0.3);top:0;right:0;');
 
 	// first you get the permissions
 	askForAudioVideoPermissions()
@@ -653,8 +740,9 @@ async function run() {
 
 				console.log('TODO start detection loop here.');
 				video.addEventListener('timeupdate', evt => {
-					console.dir(video); // evt.target
-					console.dir(evt); // evt.target
+					// console.dir(video); // evt.target
+					// console.dir(evt); // evt.target
+					detect(video);
 				});
 	
 				requestAnimationFrame(animate);
@@ -714,12 +802,7 @@ function detect(video){
 							originalHeightPadding: 0
 						};
 
-						let frame = {
-							x: 0,
-							y: 0,
-							width: 0,
-							height: 0
-						};
+						let frame = cropBounds(0,0,0,0);
 
 						// square image for portrait fill
 						// landscape image for portrait fill
@@ -768,7 +851,8 @@ function detect(video){
 						frame.x = frame.x < 0 ? (()=> { console.log('x was negative', frame.x); return 0; })() : frame.x;
 						frame.y = frame.y < 0 ? (()=> { console.log('y was negative', frame.y); return 0; })() : frame.y;
 
-						document.querySelector('.main-container').appendChild(videoCapture.capture(frame));
+						videoCrop = frame;
+						// document.querySelector('.main-container').appendChild(videoCapture.capture(frame));
 					});
 
 					// who's in the picture?
@@ -803,7 +887,7 @@ function detect(video){
 					})
 				}
 			} else {
-				console.log('No matches');
+//				console.log('No matches');
 				resolve(faceHistory);
 			}
 		});
