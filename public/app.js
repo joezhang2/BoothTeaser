@@ -1,3 +1,5 @@
+import { TweenMax } from "gsap";
+
 // Browser driver support specifics
 var canvas, context;
 
@@ -22,6 +24,7 @@ var cameraOriginDims = {
 	y: 0,
 	z: 1
 };
+
 
 console.log(THREE.Math.generateUUID());
 
@@ -145,7 +148,10 @@ const makeProfile = (name, ss, phoneNumber, interests, bannerImage) => {
 	};
 };
 var activeProfile = makeProfile('Anon', 'Anon', 'Anon', 'Anon', '');
+// mouse cursor replacement bounds 
+var facePosition = new faceapi.Rect(0, 0, 0, 0);
 var vidMap;
+var mvp;
 
 const cropVideo = (map, cropDims, originalBounds) => {
 	// how to crop: https://github.com/mrdoob/three.js/issues/1847
@@ -153,6 +159,52 @@ const cropVideo = (map, cropDims, originalBounds) => {
 	map.repeat.y = cropDims.height / originalBounds.height;
 	map.offset.x = ( cropDims.x / cropDims.width ) * map.repeat.x; // position x in pixels / crop size in pixels
 	map.offset.y = ( cropDims.y / cropDims.height ) * map.repeat.y;
+};
+
+// profile: makeProfile(getRandomName(), '444-11-6666', '+1-541-754-3010', '', ''),
+// originalBox: face.detection.box,
+// croppedBox: new faceapi.Rect(frame.x, frame.y, frame.width, frame.height)
+
+var lastBestArea = 0;
+var cameraPositionTween;
+var cameraAnimation = new TimelineMax();
+
+const updateFaces = (activeFaces) => {
+	let bestActiveArea = 0;
+	let vip;
+	activeFaces.forEach(person => {
+		let area = person.originalBox.width * person.originalBox.height;
+		if (area > bestActiveArea) {
+			vip = person;
+		} 
+	});
+
+	(index, target) {
+		console.log(index, target);
+		return (index + 1) * 100 // 100, 200, 300
+	  }
+
+	mvp = vip;
+	if (cameraAnimation) { cameraAnimation.kill(); }
+	cameraAnimation.add(TweenMax.to(camera.rotation, 0.5, {
+		x: (index, target)=>{
+			console.log(index, target);
+			return (index + 1) * 100; // 100, 200, 300
+		},
+		y: (index, target)=>{
+			console.log(index, target);
+			return (index + 1) * 100; // 100, 200, 300
+		},
+		z: (index, target)=>{
+			console.log(index, target);
+			return (index + 1) * 100; // 100, 200, 300
+		}
+	}));
+	cameraPositionTween = TweenMax.to(camera.position, 0.5, {
+		x: (index, target)=>{},
+		y: (index, target)=>{},
+		z: (index, target)=>{}
+	});
 };
 
 const drawAdContainer = (video) => {
@@ -769,7 +821,7 @@ function detect(video){
 					
 					const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
 
-					const faces = detections.map((face) => {
+					const faces = detections.map(face => {
 						console.log(face.detection.box);
 						const fb = face.detection.box;
 
@@ -833,7 +885,8 @@ function detect(video){
 						frame.x = frame.x < 0 ? (()=> { console.log('x was negative', frame.x); return 0; })() : frame.x;
 						frame.y = frame.y < 0 ? (()=> { console.log('y was negative', frame.y); return 0; })() : frame.y;
 
-						videoCrop = frame;
+						// videoCrop = frame;
+						// facePosition = face.detection.box;
 						return {
 							profile: makeProfile(getRandomName(), '444-11-6666', '+1-541-754-3010', '', ''),
 							originalBox: face.detection.box,
@@ -842,9 +895,10 @@ function detect(video){
 						// document.querySelector('.main-container').appendChild(videoCapture.capture(frame));
 					});
 
-//					faces.
+					updateFaces(faces);
 
 					// who's in the picture?
+					/*
 					faceapi.extractFaces(video, regionsToExtract).then(canvases => {
 
 						const faces = names.reduce((o, name, i) => { 
@@ -874,6 +928,7 @@ function detect(video){
 						bh.updateCanvases(faces);
 						resolve(faceHistory);
 					})
+					*/
 				}
 			} else {
 //				console.log('No matches');
