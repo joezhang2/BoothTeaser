@@ -23,6 +23,8 @@ var cameraOriginDims = {
 	z: 1
 };
 
+console.log(THREE.Math.generateUUID());
+
 // current state of rotation animation
 var angle = 0;
 
@@ -487,26 +489,6 @@ const addLettersToScene = (geometries) => {
 	});
 };
 
-class VideoCapture {
-	constructor (video) {
-		this.video = video;
-		this.canvas = document.createElement('canvas');
-		this.context = this.canvas.getContext('2d');
-		this.canvas.width = video.videoWidth;
-		this.canvas.height = video.videoHeight;
-	}
-
-	capture (bounds) {
-		// transfer cropped video still to canvas
-		this.context.drawImage(this.video, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
-		// return ss object
-		return {
-			width: bounds.width,
-			height: bounds.height,
-			data: this.context.getImageData(0, 0, bounds.width, bounds.height)
-		};
-	}
-}
 
 let faceHistory = [];
 class Person {
@@ -770,11 +752,11 @@ function detect(video){
 		.then(detections => {
 			// found something
 			if(detections.length > 0){
-				// don't know who
+				// don't know anyone. Treat everyone as new.
 				if(faceHistory.length === 0) {
 					faceHistory = [ 
 						...faceHistory, 
-						...detections.map(detection=> new faceapi.LabeledFaceDescriptors(
+						...detections.map(detection => new faceapi.LabeledFaceDescriptors(
 							getRandomName(),
 							[detection.descriptor])
 					)];
@@ -787,7 +769,7 @@ function detect(video){
 					
 					const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
 
-					const faces = detections.forEach((face) => {
+					const faces = detections.map((face) => {
 						console.log(face.detection.box);
 						const fb = face.detection.box;
 
@@ -852,8 +834,15 @@ function detect(video){
 						frame.y = frame.y < 0 ? (()=> { console.log('y was negative', frame.y); return 0; })() : frame.y;
 
 						videoCrop = frame;
+						return {
+							profile: makeProfile(getRandomName(), '444-11-6666', '+1-541-754-3010', '', ''),
+							originalBox: face.detection.box,
+							croppedBox: new faceapi.Rect(frame.x, frame.y, frame.width, frame.height)
+						};
 						// document.querySelector('.main-container').appendChild(videoCapture.capture(frame));
 					});
+
+//					faces.
 
 					// who's in the picture?
 					faceapi.extractFaces(video, regionsToExtract).then(canvases => {
