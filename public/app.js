@@ -491,24 +491,25 @@ const addLettersToScene = (geometries) => {
 let faceHistory = [];
 let profileCache = {};
 
-const createProfileCacheEntry = (box) => {
+const createProfileCacheEntry = (box, landmarks) => {
 	const uuid = "person-" + THREE.Math.generateUUID();
 	profileCache[uuid] = {
 		"active" : true,
 		"profile" : faker.helpers.createCard(),
 		"boundary" : box,
 		"priority" : box.area,
-		"timestamp" : new Date().getTime()
+		"timestamp" : new Date().getTime(),
+		"landmarks" : landmarks
 	}
 	return uuid;
 }
 
-const updateProfileCacheEntry = (uuid, box, active)=> {
-	console.log(profileCache)
+const updateProfileCacheEntry = (uuid, box, active, landmarks)=> {
 	profileCache[uuid].active = active;
 	profileCache[uuid].boundary = box;
 	profileCache[uuid].timestamp = new Date().getTime();
 	profileCache[uuid].priority = box.area;
+	profileCache[uuid].landmarks = landmarks;
 	return uuid;
 }
 
@@ -790,7 +791,7 @@ function detect(video){
 				} else {
 					const faceMatcher = new faceapi.FaceMatcher(faceHistory);
 					const matches = detections.map(d => faceMatcher.matchDescriptor(d.descriptor));
-					const names = matches.map((m,i) => m.distance > 0.6 ? createProfileCacheEntry(detections[i].detection.box) : updateProfileCacheEntry(m.label, detections[i].detection.box, true));
+					const names = matches.map((m,i) => m.distance > 0.6 ? createProfileCacheEntry(detections[i].detection.box, detections[i].landmarks) : updateProfileCacheEntry(m.label, detections[i].detection.box, true, detections[i].landmarks));
 					faceHistory.map(labeledDescriptors => labeledDescriptors.label).filter(l => names.indexOf(l)<0).forEach(deactivateProfileCacheEntry);
 					const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
 
