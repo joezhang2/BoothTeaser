@@ -23,8 +23,6 @@ var cameraOriginDims = {
 	z: 1
 };
 
-console.log(THREE.Math.generateUUID());
-
 // current state of rotation animation
 var angle = 0;
 
@@ -34,7 +32,7 @@ const totalBuckets = 360;
 const bucketAngleSize = 360 / totalBuckets;
 
 const cameraHoverDistance = 75;
-
+const faker = window.faker;
 const faceapi = window.faceapi;
 const MODELS_PATH = '/public/models';
 const lastNames = ['SMITH','JOHNSON','WILLIAMS','BROWN','JONES','MILLER','DAVIS','GARCIA','RODRIGUEZ','WILSON','MARTINEZ','ANDERSON','TAYLOR','THOMAS','HERNANDEZ','MOORE','MARTIN','JACKSON','THOMPSON','WHITE','LOPEZ','LEE','GONZALEZ','HARRIS','CLARK','LEWIS','ROBINSON','WALKER','PEREZ','HALL','YOUNG','ALLEN','SANCHEZ','WRIGHT','KING','SCOTT','GREEN','BAKER','ADAMS','NELSON','HILL','RAMIREZ','CAMPBELL','MITCHELL','ROBERTS','CARTER','PHILLIPS','EVANS','TURNER','TORRES','PARKER','COLLINS','EDWARDS','STEWART','FLORES','MORRIS','NGUYEN','MURPHY','RIVERA','COOK','ROGERS','MORGAN','PETERSON','COOPER','REED','BAILEY','BELL','GOMEZ','KELLY','HOWARD','WARD','COX','DIAZ','RICHARDSON','WOOD','WATSON','BROOKS','BENNETT','GRAY','JAMES','REYES','CRUZ','HUGHES','PRICE','MYERS','LONG','FOSTER','SANDERS','ROSS','MORALES','POWELL','SULLIVAN','RUSSELL','ORTIZ','JENKINS','GUTIERREZ','PERRY','BUTLER','BARNES','FISHER','HENDERSON','COLEMAN','SIMMONS','PATTERSON','JORDAN','REYNOLDS','HAMILTON','GRAHAM','KIM','GONZALES','ALEXANDER','RAMOS','WALLACE','GRIFFIN','WEST','COLE','HAYES','CHAVEZ','GIBSON','BRYANT','ELLIS','STEVENS','MURRAY','FORD','MARSHALL','OWENS','MCDONALD','HARRISON','RUIZ','KENNEDY','WELLS','ALVAREZ','WOODS','MENDOZA','CASTILLO','OLSON','WEBB','WASHINGTON','TUCKER','FREEMAN','BURNS','HENRY','VASQUEZ','SNYDER','SIMPSON','CRAWFORD','JIMENEZ','PORTER','MASON','SHAW','GORDON','WAGNER','HUNTER','ROMERO','HICKS','DIXON','HUNT','PALMER','ROBERTSON','BLACK','HOLMES','STONE','MEYER','BOYD','MILLS','WARREN','FOX','ROSE','RICE','MORENO','SCHMIDT','PATEL','FERGUSON','NICHOLS','HERRERA','MEDINA','RYAN','FERNANDEZ','WEAVER','DANIELS','STEPHENS','GARDNER','PAYNE','KELLEY','DUNN','PIERCE','ARNOLD','TRAN','SPENCER','PETERS','HAWKINS','GRANT','HANSEN','CASTRO','HOFFMAN','HART','ELLIOTT','CUNNINGHAM','KNIGHT'];
@@ -491,6 +489,33 @@ const addLettersToScene = (geometries) => {
 
 
 let faceHistory = [];
+let profileCache = {};
+
+const createProfileCacheEntry = (box) => {
+	const uuid = "person-" + THREE.Math.generateUUID();
+	profileCache[uuid] = {
+		"active" : true,
+		"profile" : faker.helpers.createCard(),
+		"boundary" : box,
+		"priority" : box.area,
+		"timestamp" : new Date().getTime()
+	}
+	return uuid;
+}
+
+const updateProfileCacheEntry = (uuid, box, active)=> {
+	console.log(profileCache)
+	profileCache[uuid].active = active;
+	profileCache[uuid].boundary = box;
+	profileCache[uuid].timestamp = new Date().getTime();
+	profileCache[uuid].priority = box.area;
+	return uuid;
+}
+
+const deactivateProfileCacheEntry = (uuid) => {
+	profileCache[uuid].active = false;
+}
+
 class Person {
 	constructor(face, name) {
 		this.faces = [face];
@@ -757,7 +782,7 @@ function detect(video){
 					faceHistory = [ 
 						...faceHistory, 
 						...detections.map(detection => new faceapi.LabeledFaceDescriptors(
-							getRandomName(),
+							createProfileCacheEntry(detection.detection.box),
 							[detection.descriptor])
 					)];
 					resolve(faceHistory);
@@ -765,12 +790,12 @@ function detect(video){
 				} else {
 					const faceMatcher = new faceapi.FaceMatcher(faceHistory);
 					const matches = detections.map(d => faceMatcher.matchDescriptor(d.descriptor));
-					const names = matches.map(m => m.distance > 0.6 ? getRandomName() : m.label);
-					
+					const names = matches.map((m,i) => m.distance > 0.6 ? createProfileCacheEntry(detections[i].detection.box) : updateProfileCacheEntry(m.label, detections[i].detection.box, true));
+					faceHistory.map(labeledDescriptors => labeledDescriptors.label).filter(l => names.indexOf(l)<0).forEach(deactivateProfileCacheEntry);
 					const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
 
 					const faces = detections.map((face) => {
-						console.log(face.detection.box);
+						//console.log(face.detection.box);
 						const fb = face.detection.box;
 
 						let scale = 1,
@@ -828,7 +853,7 @@ function detect(video){
 							frame.height = fb.height;
 
 						}
-						console.log(fb, adjusted, frame);
+						//console.log(fb, adjusted, frame);
 
 						frame.x = frame.x < 0 ? (()=> { console.log('x was negative', frame.x); return 0; })() : frame.x;
 						frame.y = frame.y < 0 ? (()=> { console.log('y was negative', frame.y); return 0; })() : frame.y;
@@ -870,7 +895,7 @@ function detect(video){
 							})
 						];
 						
-						console.log(faces);
+						//console.log(faces);
 						bh.updateCanvases(faces);
 						resolve(faceHistory);
 					})
