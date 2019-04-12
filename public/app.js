@@ -82,7 +82,7 @@ const start3d = () => {
 		var resizeThrottle;
 
 		const onWinResize = () => {
-			if(resizeThrottle) clearTimeout(resizeThrottle);
+			if(resizeThrottle) { clearTimeout(resizeThrottle); resizeThrottle = null; }
 			resizeThrottle = setTimeout(()=>{
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				camera.aspect = window.innerWidth / window.innerHeight;
@@ -169,7 +169,7 @@ const createProfileCacheEntry = (box, landmarks) => {
 	profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
 
 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
+	if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
 
 	return profileCache[profileCache.length-1].uuid;
 };
@@ -184,13 +184,13 @@ const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
 		person.timestamp = Date.now();
 		person.priority = box.area;
 		person.landmarks = landmarks;
-		if (person.idleTimeout) { clearTimeout(person.idleTimeout); }
+		if (person.idleTimeout) { clearTimeout(person.idleTimeout); person.idleTimeout = null; }
 	} else {
 		console.error(uuid, 'was not found in list on updated');
 	}
 
 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
+	if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
 
 	return uuid;
 };
@@ -211,7 +211,7 @@ const deactivateProfileCacheEntry = uuid => {
 	}
 
 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
+	if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
 };
 
 
@@ -296,17 +296,20 @@ const calculateCameraPositionFromViewerPerspective = vip => {
 };
 
 let idleCameraTimeout;
-const updateCameraWithNewFacePosition = faces => {
-	console.log('current camera pos', camera.position.x);
+const updateCameraWithNewFacePosition = () => {
+	console.log('-!-!-!-!- update camera position');
+	console.log('current camera pos', camera.position.x, updateCamera);
 	// clear update delegates if any are pending
-	if(updateCamera) { clearTimeout(updateCamera); }
+	if(updateCamera) { clearTimeout(updateCamera); updateCamera = null; }
+
+	let faces = profileCache;
 	
 	let vip;
 
 	console.log(faces);
 	for (let i = 0; i < faces.length; i++) {
 		let person = faces[i];
-		console.log('am i active',person.active, person.uuid);
+		console.log('am i active', person.active, person.uuid, person.idleTimeout);
 		if (person.active && !person.idleTimeout && (!vip || person.priority > vip.priority)) {
 			vip = person;
 			console.log('best area is now', person.priority);
@@ -317,12 +320,12 @@ const updateCameraWithNewFacePosition = faces => {
 		if (!idleCameraTimeout) {
 			idleCameraTimeout = setTimeout(() => {
 				cameraTarget = {x:0,y:0};
+				updateCameraWithNewFacePosition();
 			}, 500);
 		}
-	} else if (mvp && mvp.uuid === vip.uuid && mvp.priority === vip.priority) {
-		console.log(vip, '===', mvp, 'nothing to do. exiting');
-		return;
 	} else {
+		if (idleCameraTimeout) { clearTimeout(idleCameraTimeout); idleCameraTimeout = null; }
+
 		cameraTarget = calculateCameraPositionFromViewerPerspective(vip);
 	}
 
@@ -928,8 +931,7 @@ async function run() {
 					// console.dir(video); // evt.target
 					// console.dir(evt); // evt.target
 //				});
-				setTimeout(detect, 100, video);
-	
+				detect(video);
 				requestAnimationFrame(animate);
 			});
 
@@ -970,9 +972,11 @@ const detect = video => {
 					let uuid;
 					if (m.distance > 0.6) { // was 0.6, but found low light testing was around 0.5
 						uuid = createProfileCacheEntry(detections[i].detection.box, detections[i].landmarks);
+						console.log('creating new user entry', uuid);
 						labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(uuid, [detections[i].descriptor]));
 					} else {
 						uuid = updateProfileCacheEntry(m.label, detections[i].detection.box, true, detections[i].landmarks);
+						console.log('Updated user entry', uuid);
 					}
 					return uuid;
 				});
@@ -984,26 +988,29 @@ const detect = video => {
 				// loop through the leftovers and mark them inactive
 				inactiveUuids.forEach(deactivateProfileCacheEntry);
 
-				// console.log('---------------------------------------');
-				// console.log('total labels', labeledDescriptors.length);
-				// console.log('total detections', detections.length);
-				// console.log('total matches', matches.length);
-				// console.log('total activeUuids', activeUuids.length);
-				// console.log('total allUuids', activeUuids.length);
-				// console.log('total inactiveUuids', activeUuids.length);
+				console.log('---------------------------------------');
+				console.log('total labels', labeledDescriptors.length);
+				console.log('total detections', detections.length);
+				console.log('total matches', matches.length);
+				console.log('total activeUuids', activeUuids.length);
+				console.log('total allUuids', activeUuids.length);
+				console.log('total inactiveUuids', activeUuids.length);
+				console.log('---------------------------------------');
 			}
 		} else {
 			// when there are no faces detected, filter the profile cache to active users and deactivate just those users
-			labeledDescriptors.filter(descriptor => {
-				// get the uuids of everyone in the cache
-				const ind =  profileCache.map(person => person.uuid)
-					// if this person is in the cache
-					.indexOf(descriptor.label);
-				//checks if person with uuid exists and is active
-				return (ind > -1) && profileCache[ind].active;
-			}).forEach(descriptor => {
-				console.log('This person was deemed unfit for focus', descriptor.label);
-				deactivateProfileCacheEntry(descriptor.label);
+			let activePersons = [];
+			labeledDescriptors.forEach(descriptor => {
+				activePersons.concat(profileCache.filter(person => {
+					if (descriptor.label === person.uuid && person.active) {
+						return true;
+					}
+				}));
+			})
+			
+			activePersons.reduce((x, y) => x.includes(y) ? x : [...x, y], []).forEach(person => {
+				console.log('This person was deemed unfit for focus', person.uuid);
+				deactivateProfileCacheEntry(person.uuid);
 			});
 		}
 		// setTimeout was here
