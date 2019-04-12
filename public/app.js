@@ -152,7 +152,6 @@ const start3d = () => {
 let profileCache = [];
 let updateCamera;
 
-
 const createPerson = (active, profile, boundary, priority, timestamp, landmarks) => {
 	return {
 		uuid: THREE.Math.generateUUID(),
@@ -161,7 +160,8 @@ const createPerson = (active, profile, boundary, priority, timestamp, landmarks)
 		boundary,
 		priority,
 		timestamp,
-		landmarks
+		landmarks,
+		idleTimeout: null
 	};
 };
 
@@ -176,7 +176,7 @@ const createProfileCacheEntry = (box, landmarks) => {
 
 
 const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
-	const index = profileCache.findIndex(person => person.uuid===uuid);
+	const index = profileCache.findIndex(person => person.uuid === uuid);
 	if (index > -1) {
 		const person = profileCache[index];
 		person.active = active;
@@ -184,6 +184,7 @@ const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
 		person.timestamp = Date.now();
 		person.priority = box.area;
 		person.landmarks = landmarks;
+		if (person.idleTimeout) { clearTimeout(person.idleTimeout); }
 	} else {
 		console.error(uuid, 'was not found in list on updated');
 	}
@@ -195,11 +196,16 @@ const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
 };
 
 
-const deactivateProfileCacheEntry = (uuid) => {
-	const index = profileCache.findIndex(person => person.uuid===uuid);
+const deactivateProfileCacheEntry = uuid => {
+	const index = profileCache.findIndex(person => person.uuid === uuid);
 	if (index > -1) {
 		const person = profileCache[index];
-		person.active = false;
+		if (!person.idleTimeout) {
+			// if a person disappears from view for 1 second, mark them as inactive
+			person.idleTimeout = setTimeout(() => {
+				person.active = false;
+			}, 1000);
+		}
 	} else {
 		console.error(uuid, 'was not found in list on deactivate');
 	}
@@ -240,50 +246,13 @@ const cropVideo = (map, cropDims, originalBounds) => {
 };
 
 
-var lastBestArea = 0;
-var videoCropTweens = [];
-var cameraTweens = [];
+let lastBestArea = 0;
+let videoCropTweens = [];
+let cameraTweens = [];
+let cameraTarget = {x:0,y:0};
 
-/*
-		active,
-		profile,
-		boundary,
-		priority,
-		timestamp,
-		landmarks
-*/
 
-const updateCameraWithNewFacePosition = (faces) => {
-	console.log('current camera pos', camera.position.x);
-	// clear update delegates if any are pending
-	if(updateCamera) { clearTimeout(updateCamera); }
-	
-	let vip;
-
-	console.log(faces);
-	for (let i = 0; i < faces.length; i++) {
-		let person = faces[i];
-		console.log('am i active',person.active, person.uuid);
-		if (person.active && (!vip || person.priority > vip.priority)) {
-			vip = person;
-			console.log('best area is now', person.priority);
-		}
-	}
-	// const vip = activeFaces.reduce((accumulator, person) => {
-	// 	if (person.active && person.priority > bestActiveArea) {
-	// 		bestActiveArea = person.priority;
-	// 		console.log('best area is now', person.priority);
-	// 		return person;
-	// 	}
-	// 	console.log('best area is still', accumulator.priority);
-	// 	return accumulator;
-	// });
-
-	if (mvp && mvp.uuid === vip.uuid && mvp.priority === vip.priority) {
-		console.log(vip, '===', mvp, 'nothing to do. exiting');
-		return;
-	}
-
+const calculateCameraPositionFromViewerPerspective = vip => {
 	mvp = vip;
 	
 	//	2D math
@@ -320,19 +289,55 @@ const updateCameraWithNewFacePosition = (faces) => {
 
 	console.log({xFacePos2D,xDeltaFromCenter,deltaBetweenHorizontalDims,xRelativeCameraPos,xTargetAdjusted});
 	console.log({yFacePos2D,yDeltaFromCenter,deltaBetweenVerticalDims,yRelativeCameraPos,yTargetAdjusted});
+	return {
+		x: xTargetAdjusted,
+		y: yTargetAdjusted
+	};
+};
+
+let idleCameraTimeout;
+const updateCameraWithNewFacePosition = faces => {
+	console.log('current camera pos', camera.position.x);
+	// clear update delegates if any are pending
+	if(updateCamera) { clearTimeout(updateCamera); }
+	
+	let vip;
+
+	console.log(faces);
+	for (let i = 0; i < faces.length; i++) {
+		let person = faces[i];
+		console.log('am i active',person.active, person.uuid);
+		if (person.active && !person.idleTimeout && (!vip || person.priority > vip.priority)) {
+			vip = person;
+			console.log('best area is now', person.priority);
+		}
+	}
+	
+	if (!vip) {
+		if (!idleCameraTimeout) {
+			idleCameraTimeout = setTimeout(() => {
+				cameraTarget = {x:0,y:0};
+			}, 500);
+		}
+	} else if (mvp && mvp.uuid === vip.uuid && mvp.priority === vip.priority) {
+		console.log(vip, '===', mvp, 'nothing to do. exiting');
+		return;
+	} else {
+		cameraTarget = calculateCameraPositionFromViewerPerspective(vip);
+	}
 
 	if (cameraTweens.length) {
 		cameraTweens.pop().kill();
-		// cameraTweens.pop().kill();
+		cameraTweens.pop().kill();
 	}
 
 	cameraTweens.push(TweenMax.to(camera.position, 1, {
-		x: xTargetAdjusted,
+		x: cameraTarget.x,
 		ease: Sine.easeOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
 	cameraTweens.push(TweenMax.to(camera.rotation, 1, {
-		y: yTargetAdjusted,
+		y: cameraTarget.y,
 		ease: Sine.easeOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
@@ -876,7 +881,7 @@ async function run() {
 	// then you actually get the media from the device you want
 	.then(device=>startPlayingVideo(device, video))
 	// then you can run start setting up a 3D environment to use it
-	.then(()=>{
+	.then(() => {
 
 		console.log('after AV perms granted and streams started', Date.now() - startTime);
 
@@ -923,7 +928,7 @@ async function run() {
 					// console.dir(video); // evt.target
 					// console.dir(evt); // evt.target
 //				});
-				setTimeout(detect, 500, video);
+				setTimeout(detect, 200, video);
 	
 				requestAnimationFrame(animate);
 			});
@@ -938,7 +943,8 @@ async function run() {
 
 
 let labeledDescriptors = [];
-const detect = (video) => {
+let appIdleTimeout;
+const detect = video => {
 	faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
 	.withFaceLandmarks(true)
 	.withFaceDescriptors()
@@ -962,7 +968,7 @@ const detect = (video) => {
 				// see if there are any good ones, and if so, find out which ones
 				const activeUuids = matches.map((m,i) => { 
 					let uuid;
-					if (m.distance > 0.5) { // was 0.6, but found low light testing was around 0.5
+					if (m.distance > 0.6) { // was 0.6, but found low light testing was around 0.5
 						uuid = createProfileCacheEntry(detections[i].detection.box, detections[i].landmarks);
 						labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(uuid, [detections[i].descriptor]));
 					} else {
@@ -972,59 +978,37 @@ const detect = (video) => {
 				});
 
 				// sort through the knowns
-				const allUuids = labeledDescriptors.map(labeledDescriptors => labeledDescriptors.label);
+				const allUuids = labeledDescriptors.map(descriptor => descriptor.label);
 				// cross check them with active faces and if none exist...
 				const inactiveUuids = allUuids.filter(uuid => activeUuids.indexOf(uuid) < 0);
 				// loop through the leftovers and mark them inactive
 				inactiveUuids.forEach(deactivateProfileCacheEntry);
 
-				/*
-				// need logic here for unmatched to create descriptors for them
-				labeledDescriptors = detections.map(detection => {
-					const uuid = createProfileCacheEntry(detection.detection.box, detection.landmarks);
-					return new faceapi.LabeledFaceDescriptors(uuid, [detection.descriptor]);
-				});
-				*/
-
-				console.log('---------------------------------------');
-				console.log('total labels', labeledDescriptors.length);
-				console.log('total detections', detections.length);
-				console.log('total matches', matches.length);
-				console.log('total activeUuids', activeUuids.length);
-				console.log('total allUuids', activeUuids.length);
-				console.log('total inactiveUuids', activeUuids.length);
-				
-				/*
-				const faces = activeUuids.reduce((o, name, i) => { 
-					return { 
-						...o, 
-						[name]: {
-							detection: detections[i],
-							match: matches[i]
-						}
-					};
-				}, {});
-			
-				faceHistory = [ 
-					...faceHistory, 
-					...names.filter((name,i)=>{
-						return faces[name].match.distance > 0.5; // face match threshold
-					})
-					.map((name)=> {
-						return new faceapi.LabeledFaceDescriptors(
-							name,
-							[faces[name].detection.descriptor]
-						);
-					})
-				];
-				*/
+				// console.log('---------------------------------------');
+				// console.log('total labels', labeledDescriptors.length);
+				// console.log('total detections', detections.length);
+				// console.log('total matches', matches.length);
+				// console.log('total activeUuids', activeUuids.length);
+				// console.log('total allUuids', activeUuids.length);
+				// console.log('total inactiveUuids', activeUuids.length);
 			}
 		} else {
-
+			// when there are no faces detected, filter the profile cache to active users and deactivate just those users
+			labeledDescriptors.filter(descriptor => {
+				// get the uuids of everyone in the cache
+				const ind =  profileCache.map(person => person.uuid)
+					// if this person is in the cache
+					.indexOf(descriptor.label);
+				//checks if person with uuid exists and is active
+				return (ind > -1) && profileCache[ind].active;
+			}).forEach(descriptor => {
+				console.log('This person was deemed unfit for focus', descriptor.label);
+				deactivateProfileCacheEntry(descriptor.label);
+			});
 		}
 		// setTimeout was here
 		setTimeout(detect, 200, video);
-	}).catch((err)=>{
+	}).catch(err => {
 		console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 		console.error('badness in the face detction. could not detect. exiting app.');
 		console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
