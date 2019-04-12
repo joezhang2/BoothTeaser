@@ -166,13 +166,12 @@ const createPerson = (active, profile, boundary, priority, timestamp, landmarks)
 };
 
 const createProfileCacheEntry = (box, landmarks) => {
-	const uuid = THREE.Math.generateUUID();
 	profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
 
 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
 	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
 
-	return uuid;
+	return profileCache[profileCache.length-1].uuid;
 };
 
 
@@ -185,6 +184,8 @@ const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
 		person.timestamp = Date.now();
 		person.priority = box.area;
 		person.landmarks = landmarks;
+	} else {
+		console.error(uuid, 'was not found in list on updated');
 	}
 
 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
@@ -199,6 +200,8 @@ const deactivateProfileCacheEntry = (uuid) => {
 	if (index > -1) {
 		const person = profileCache[index];
 		person.active = false;
+	} else {
+		console.error(uuid, 'was not found in list on deactivate');
 	}
 
 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
@@ -260,6 +263,7 @@ const updateCameraWithNewFacePosition = (faces) => {
 	console.log(faces);
 	for (let i = 0; i < faces.length; i++) {
 		let person = faces[i];
+		console.log('am i active',person.active, person.uuid);
 		if (person.active && (!vip || person.priority > vip.priority)) {
 			vip = person;
 			console.log('best area is now', person.priority);
@@ -322,14 +326,14 @@ const updateCameraWithNewFacePosition = (faces) => {
 		// cameraTweens.pop().kill();
 	}
 
-	cameraTweens.push(TweenMax.to(camera.position, 0.5, {
+	cameraTweens.push(TweenMax.to(camera.position, 1, {
 		x: xTargetAdjusted,
-		ease: Power2.easeInOut, 
+		ease: Sine.easeOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
-	cameraTweens.push(TweenMax.to(camera.rotation, 0.5, {
+	cameraTweens.push(TweenMax.to(camera.rotation, 1, {
 		y: yTargetAdjusted,
-		ease: Power2.easeInOut, 
+		ease: Sine.easeOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
 
@@ -345,6 +349,12 @@ const updateCameraWithNewFacePosition = (faces) => {
 
 
 /*
+const photoRatio = 4/3;
+const thumb = { 
+	width: 300, // height = 225
+	height: 300 * photoRatio
+};
+
 const faces = detections.map(face => {
 	//console.log(face.detection.box);
 	const fb = face.detection.box;
@@ -926,75 +936,99 @@ async function run() {
 
 }
 
-const photoRatio = 4/3;
-const thumb = { 
-	width: 300, // height = 225
-	height: 300 * photoRatio
-};
 
-let faceHistory = [];
-function detect(video){
-
+let labeledDescriptors = [];
+const detect = (video) => {
 	faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
 	.withFaceLandmarks(true)
 	.withFaceDescriptors()
 	.then(detections => {
+		console.log('================================');
+		console.log('detection length', detections.length);
 		// found something
 		if(detections.length > 0){
 			// Everyone is new. First time running through things.
-			if(faceHistory.length === 0) {
-				faceHistory = [ 
-					...faceHistory, 
-					...detections.map(detection => new faceapi.LabeledFaceDescriptors(
-						createProfileCacheEntry(detection.detection.box),
-						[detection.descriptor])
-				)];
+			if(profileCache.length === 0) {
+				labeledDescriptors = detections.map(detection => {
+					const uuid = createProfileCacheEntry(detection.detection.box, detection.landmarks);
+					return new faceapi.LabeledFaceDescriptors(uuid, [detection.descriptor]);
+				});
 			// probably know someone
 			} else {
-				const faceMatcher = new faceapi.FaceMatcher(faceHistory);
+				// prime previous matches
+				const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors);
+				// look though previous faces and qualify how good they are
 				const matches = detections.map(d => faceMatcher.matchDescriptor(d.descriptor));
-				const names = matches.map((m,i) => { 
-					return m.distance > 0.6 ?
-						createProfileCacheEntry(detections[i].detection.box, detections[i].landmarks):
-						updateProfileCacheEntry(m.label, detections[i].detection.box, true, detections[i].landmarks);
+				// see if there are any good ones, and if so, find out which ones
+				const activeUuids = matches.map((m,i) => { 
+					let uuid;
+					if (m.distance > 0.5) { // was 0.6, but found low light testing was around 0.5
+						uuid = createProfileCacheEntry(detections[i].detection.box, detections[i].landmarks);
+						labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(uuid, [detections[i].descriptor]));
+					} else {
+						uuid = updateProfileCacheEntry(m.label, detections[i].detection.box, true, detections[i].landmarks);
+					}
+					return uuid;
 				});
-				faceHistory
-					.map(labeledDescriptors => labeledDescriptors.label)
-					.filter(l => names.indexOf(l)<0)
-					.forEach(deactivateProfileCacheEntry);
 
-				const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
+				// sort through the knowns
+				const allUuids = labeledDescriptors.map(labeledDescriptors => labeledDescriptors.label);
+				// cross check them with active faces and if none exist...
+				const inactiveUuids = allUuids.filter(uuid => activeUuids.indexOf(uuid) < 0);
+				// loop through the leftovers and mark them inactive
+				inactiveUuids.forEach(deactivateProfileCacheEntry);
 
-				faceapi.extractFaces(video, regionsToExtract).then(canvases => {
+				/*
+				// need logic here for unmatched to create descriptors for them
+				labeledDescriptors = detections.map(detection => {
+					const uuid = createProfileCacheEntry(detection.detection.box, detection.landmarks);
+					return new faceapi.LabeledFaceDescriptors(uuid, [detection.descriptor]);
+				});
+				*/
 
-					const faces = names.reduce((o, name, i) => { 
-						return { 
-							...o, [name]: {
-								'detection': detections[i],
-								'match': matches[i],
-								'canvas': canvases[i]
-							}
-						};
-					}, {});
+				console.log('---------------------------------------');
+				console.log('total labels', labeledDescriptors.length);
+				console.log('total detections', detections.length);
+				console.log('total matches', matches.length);
+				console.log('total activeUuids', activeUuids.length);
+				console.log('total allUuids', activeUuids.length);
+				console.log('total inactiveUuids', activeUuids.length);
 				
-					faceHistory = [ 
-						...faceHistory, 
-						...names.filter((name,i)=>{
-							return faces[name].match.distance > 0.6; // face match threshold
-						})
-						.map((name)=> {
-							return new faceapi.LabeledFaceDescriptors(
-								name,
-								[faces[name].detection.descriptor]
-							);
-						})
-					];
-					
-				});
+				/*
+				const faces = activeUuids.reduce((o, name, i) => { 
+					return { 
+						...o, 
+						[name]: {
+							detection: detections[i],
+							match: matches[i]
+						}
+					};
+				}, {});
+			
+				faceHistory = [ 
+					...faceHistory, 
+					...names.filter((name,i)=>{
+						return faces[name].match.distance > 0.5; // face match threshold
+					})
+					.map((name)=> {
+						return new faceapi.LabeledFaceDescriptors(
+							name,
+							[faces[name].detection.descriptor]
+						);
+					})
+				];
+				*/
 			}
+		} else {
+
 		}
+		// setTimeout was here
+		setTimeout(detect, 200, video);
+	}).catch((err)=>{
+		console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+		console.error('badness in the face detction. could not detect. exiting app.');
+		console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 	});
-	setTimeout(detect, 500, video);
 }
 
 
