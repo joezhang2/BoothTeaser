@@ -1,5 +1,3 @@
-import { TweenMax } from "gsap";
-
 // Browser driver support specifics
 var canvas, context;
 
@@ -25,8 +23,10 @@ var cameraOriginDims = {
 	z: 1
 };
 
-
-console.log(THREE.Math.generateUUID());
+var visibleBounds = {
+	width: 0,
+	height: 0
+};
 
 // current state of rotation animation
 var angle = 0;
@@ -37,7 +37,7 @@ const totalBuckets = 360;
 const bucketAngleSize = 360 / totalBuckets;
 
 const cameraHoverDistance = 75;
-
+const faker = window.faker;
 const faceapi = window.faceapi;
 const MODELS_PATH = '/public/models';
 const lastNames = ['SMITH','JOHNSON','WILLIAMS','BROWN','JONES','MILLER','DAVIS','GARCIA','RODRIGUEZ','WILSON','MARTINEZ','ANDERSON','TAYLOR','THOMAS','HERNANDEZ','MOORE','MARTIN','JACKSON','THOMPSON','WHITE','LOPEZ','LEE','GONZALEZ','HARRIS','CLARK','LEWIS','ROBINSON','WALKER','PEREZ','HALL','YOUNG','ALLEN','SANCHEZ','WRIGHT','KING','SCOTT','GREEN','BAKER','ADAMS','NELSON','HILL','RAMIREZ','CAMPBELL','MITCHELL','ROBERTS','CARTER','PHILLIPS','EVANS','TURNER','TORRES','PARKER','COLLINS','EDWARDS','STEWART','FLORES','MORRIS','NGUYEN','MURPHY','RIVERA','COOK','ROGERS','MORGAN','PETERSON','COOPER','REED','BAILEY','BELL','GOMEZ','KELLY','HOWARD','WARD','COX','DIAZ','RICHARDSON','WOOD','WATSON','BROOKS','BENNETT','GRAY','JAMES','REYES','CRUZ','HUGHES','PRICE','MYERS','LONG','FOSTER','SANDERS','ROSS','MORALES','POWELL','SULLIVAN','RUSSELL','ORTIZ','JENKINS','GUTIERREZ','PERRY','BUTLER','BARNES','FISHER','HENDERSON','COLEMAN','SIMMONS','PATTERSON','JORDAN','REYNOLDS','HAMILTON','GRAHAM','KIM','GONZALES','ALEXANDER','RAMOS','WALLACE','GRIFFIN','WEST','COLE','HAYES','CHAVEZ','GIBSON','BRYANT','ELLIS','STEVENS','MURRAY','FORD','MARSHALL','OWENS','MCDONALD','HARRISON','RUIZ','KENNEDY','WELLS','ALVAREZ','WOODS','MENDOZA','CASTILLO','OLSON','WEBB','WASHINGTON','TUCKER','FREEMAN','BURNS','HENRY','VASQUEZ','SNYDER','SIMPSON','CRAWFORD','JIMENEZ','PORTER','MASON','SHAW','GORDON','WAGNER','HUNTER','ROMERO','HICKS','DIXON','HUNT','PALMER','ROBERTSON','BLACK','HOLMES','STONE','MEYER','BOYD','MILLS','WARREN','FOX','ROSE','RICE','MORENO','SCHMIDT','PATEL','FERGUSON','NICHOLS','HERRERA','MEDINA','RYAN','FERNANDEZ','WEAVER','DANIELS','STEPHENS','GARDNER','PAYNE','KELLEY','DUNN','PIERCE','ARNOLD','TRAN','SPENCER','PETERS','HAWKINS','GRANT','HANSEN','CASTRO','HOFFMAN','HART','ELLIOTT','CUNNINGHAM','KNIGHT'];
@@ -49,6 +49,31 @@ const minMaxRand = (min, max) => {
 
 const rads = (degrees) => {
 	return THREE.Math.degToRad(degrees); //  * Math.PI / 180;
+};
+
+const getVisibleBounds = (depth, camera) => {
+	const visibleHeightAtZDepth = ( depth, camera ) => {
+		// compensate for cameras not positioned at z=0
+		const cameraOffset = camera.position.z;
+		if ( depth < cameraOffset ) depth -= cameraOffset;
+		else depth += cameraOffset;
+	  
+		// vertical fov in radians
+		const vFOV = camera.fov * Math.PI / 180; 
+	  
+		// Math.abs to ensure the result is always positive
+		return 2 * Math.tan( vFOV / 2 ) * Math.abs( depth );
+	};
+	
+	const visibleWidthAtZDepth = ( depth, camera ) => {
+		const height = visibleHeightAtZDepth( depth, camera );
+		return height * camera.aspect;
+	};
+
+	return {
+		width: visibleWidthAtZDepth(depth, camera),
+		height: visibleHeightAtZDepth(depth, camera)
+	};
 };
 
 const start3d = () => {
@@ -84,6 +109,7 @@ const start3d = () => {
 
 		// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
 		camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 2000); // 40
+		visibleBounds = getVisibleBounds(50, camera);
 
 //		camera.matrixAutoUpdate = false;
 
@@ -113,7 +139,7 @@ const start3d = () => {
 
 		document.body.appendChild(renderer.domElement);
 		
-		document.body.addEventListener('mousemove', onMouseMove);
+//		document.body.addEventListener('mousemove', onMouseMove);
 		window.addEventListener('resize', onWinResize);
 
 		onWinResize();
@@ -122,10 +148,68 @@ const start3d = () => {
 	});
 };
 
+
+let profileCache = [];
+let updateCamera;
+
+
+const createPerson = (active, profile, boundary, priority, timestamp, landmarks) => {
+	return {
+		uuid: THREE.Math.generateUUID(),
+		active,
+		profile,
+		boundary,
+		priority,
+		timestamp,
+		landmarks
+	};
+};
+
+const createProfileCacheEntry = (box, landmarks) => {
+	const uuid = THREE.Math.generateUUID();
+	profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
+
+	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
+	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
+
+	return uuid;
+};
+
+
+const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
+	const index = profileCache.findIndex(person => person.uuid===uuid);
+	if (index > -1) {
+		const person = profileCache[index];
+		person.active = active;
+		person.boundary = box;
+		person.timestamp = Date.now();
+		person.priority = box.area;
+		person.landmarks = landmarks;
+	}
+
+	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
+	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
+
+	return uuid;
+};
+
+
+const deactivateProfileCacheEntry = (uuid) => {
+	const index = profileCache.findIndex(person => person.uuid===uuid);
+	if (index > -1) {
+		const person = profileCache[index];
+		person.active = false;
+	}
+
+	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
+	if(!updateCamera){ setTimeout(updateCameraWithNewFacePosition, 0, profileCache); }
+};
+
+
 const cropBounds = (x,y,w,h) => {
 	return {
-		x: x,
-		y: y,
+		x,
+		y,
 		width: w,
 		height: h
 	};
@@ -138,16 +222,7 @@ var videoDims = {
 	width: 640,
 	height: 480
 };
-const makeProfile = (name, ss, phoneNumber, interests, bannerImage) => {
-	return {
-		name,
-		ss,
-		phoneNumber,
-		interests,
-		bannerImage
-	};
-};
-var activeProfile = makeProfile('Anon', 'Anon', 'Anon', 'Anon', '');
+
 // mouse cursor replacement bounds 
 var facePosition = new faceapi.Rect(0, 0, 0, 0);
 var vidMap;
@@ -161,51 +236,153 @@ const cropVideo = (map, cropDims, originalBounds) => {
 	map.offset.y = ( cropDims.y / cropDims.height ) * map.repeat.y;
 };
 
-// profile: makeProfile(getRandomName(), '444-11-6666', '+1-541-754-3010', '', ''),
-// originalBox: face.detection.box,
-// croppedBox: new faceapi.Rect(frame.x, frame.y, frame.width, frame.height)
 
 var lastBestArea = 0;
-var cameraPositionTween;
-var cameraAnimation = new TimelineMax();
+var videoCropTweens = [];
+var cameraTweens = [];
 
-const updateFaces = (activeFaces) => {
-	let bestActiveArea = 0;
+/*
+		active,
+		profile,
+		boundary,
+		priority,
+		timestamp,
+		landmarks
+*/
+
+const updateCameraWithNewFacePosition = (faces) => {
+	console.log('current camera pos', camera.position.x);
+	// clear update delegates if any are pending
+	if(updateCamera) { clearTimeout(updateCamera); }
+	
 	let vip;
-	activeFaces.forEach(person => {
-		let area = person.originalBox.width * person.originalBox.height;
-		if (area > bestActiveArea) {
-			vip = person;
-		} 
-	});
 
-	(index, target) {
-		console.log(index, target);
-		return (index + 1) * 100 // 100, 200, 300
-	  }
+	console.log(faces);
+	for (let i = 0; i < faces.length; i++) {
+		let person = faces[i];
+		if (person.active && (!vip || person.priority > vip.priority)) {
+			vip = person;
+			console.log('best area is now', person.priority);
+		}
+	}
+	// const vip = activeFaces.reduce((accumulator, person) => {
+	// 	if (person.active && person.priority > bestActiveArea) {
+	// 		bestActiveArea = person.priority;
+	// 		console.log('best area is now', person.priority);
+	// 		return person;
+	// 	}
+	// 	console.log('best area is still', accumulator.priority);
+	// 	return accumulator;
+	// });
+
+	if (mvp && mvp.uuid === vip.uuid && mvp.priority === vip.priority) {
+		console.log(vip, '===', mvp, 'nothing to do. exiting');
+		return;
+	}
 
 	mvp = vip;
-	if (cameraAnimation) { cameraAnimation.kill(); }
-	cameraAnimation.add(TweenMax.to(camera.rotation, 0.5, {
-		x: (index, target)=>{
-			console.log(index, target);
-			return (index + 1) * 100; // 100, 200, 300
-		},
-		y: (index, target)=>{
-			console.log(index, target);
-			return (index + 1) * 100; // 100, 200, 300
-		},
-		z: (index, target)=>{
-			console.log(index, target);
-			return (index + 1) * 100; // 100, 200, 300
-		}
+	
+	// center point before - center point after = distance;
+	// Mouse logic: (pageCenterDims.width - e.pageX) * 0.01
+	// Face logic: (face.x + (face.width/2)) / video width = % of 100 for range between two times
+	let pctX = ((mvp.boundary.x + (mvp.boundary.width/2)) / videoDims.width);
+	let x2d = pctX * (visibleBounds.width/2);
+	console.log('percent x', pctX, 'actual x', x2d, 'visible width', visibleBounds.width, 'canvas width', canvas.width);
+
+	if (cameraTweens.length) {
+		cameraTweens.pop().kill();
+		// cameraTweens.pop().kill();
+	}
+	cameraTweens.push(TweenMax.to(camera.position, 0.5, {
+		x: x2d,
+		ease: Power2.easeInOut, 
+		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
-	cameraPositionTween = TweenMax.to(camera.position, 0.5, {
-		x: (index, target)=>{},
-		y: (index, target)=>{},
-		z: (index, target)=>{}
-	});
+	// cameraTweens.push(TweenMax.to(camera.position, 0.5, {y, ease: Power2.easeInOut}));
+
+	if (videoCropTweens.length) {
+		// videoCropTweens.pop().kill();
+		// videoCropTweens.pop().kill();
+	}
+	// videoCropTweens.add(TweenMax.to(vidMap.rotation, 0.5, {x: 1, ease: Power2.easeInOut}));
+	// videoCropTweens.add(TweenMax.to(vidMap.position, 0.5, {x: 1, ease: Power2.easeInOut}));
 };
+
+
+/*
+const faces = detections.map(face => {
+	//console.log(face.detection.box);
+	const fb = face.detection.box;
+
+	let scale = 1,
+		inverseScale = 1;
+
+	// scratch pad for math
+	let adjusted = {
+		scaledWidthPadding: 0,
+		scaledHeightPadding: 0,
+		originalWidthPadding: 0,
+		originalHeightPadding: 0
+	};
+
+	let frame = cropBounds(0,0,0,0);
+
+	// square image for portrait fill
+	// landscape image for portrait fill
+	if (fb.width === fb.height || fb.width > fb.height) {
+		// resize to fit width
+		scale = thumb.width / fb.width;
+		inverseScale = fb.width / thumb.width;
+
+		adjusted.scaledWidth = fb.width * scale;
+		adjusted.scaledWidthPadding = 0;
+		adjusted.originalWidthPadding = 0;
+
+		adjusted.scaledHeight = fb.height * scale;
+		adjusted.scaledHeightPadding = thumb.height - adjusted.scaledHeight;
+		adjusted.originalHeightPadding = (adjusted.scaledHeightPadding * inverseScale);
+
+		// calculate the new x/y w/h rect for source image using applied fill and centering logic
+		frame.x = fb.x;
+		frame.y = fb.y - (adjusted.originalHeightPadding/2); // centered capture point
+		frame.width = fb.width;
+		frame.height = fb.height + adjusted.originalHeightPadding;
+
+	// portrait image for portrait fill
+	} else {
+		// resize to fit height
+		scale = thumb.height / fb.height;
+		inverseScale = fb.height / thumb.height;
+
+		adjusted.scaledWidth = fb.width * scale;
+		adjusted.scaledWidthPadding = thumb.width - adjusted.scaledWidth;
+		adjusted.originalWidthPadding = (adjusted.scaledWidthPadding * inverseScale);
+
+		adjusted.scaledHeight = fb.height * scale;
+		adjusted.scaledHeightPadding = 0;
+		adjusted.originalHeightPadding = 0;
+
+		// calculate the new x/y w/h rect for source image using applied fill and centering logic
+		frame.x = fb.x - (adjusted.originalWidthPadding/2); // centered capture point
+		frame.y = fb.y;
+		frame.width = fb.width + adjusted.originalWidthPadding;
+		frame.height = fb.height;
+
+	}
+	//console.log(fb, adjusted, frame);
+
+	frame.x = frame.x < 0 ? (()=> { console.log('x was negative', frame.x); return 0; })() : frame.x;
+	frame.y = frame.y < 0 ? (()=> { console.log('y was negative', frame.y); return 0; })() : frame.y;
+
+	// videoCrop = frame;
+	// facePosition = face.detection.box;
+	return {
+		profile: makeProfile(getRandomName(), '444-11-6666', '+1-541-754-3010', '', ''),
+		originalBox: face.detection.box,
+		croppedBox: new faceapi.Rect(frame.x, frame.y, frame.width, frame.height)
+	};
+});
+*/
 
 const drawAdContainer = (video) => {
 	
@@ -274,7 +451,7 @@ const render = () => {
 //	hideCulledMeshes();
 
 	// Tilted axis of the camera to the scene
-	camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1);
+	// camera.position.x = cameraOriginDims.x + (boxRotationDims.x * -1); // @face now
 	camera.rotation.x = rads(angle + 270);
 	camera.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.02;
 
@@ -285,7 +462,7 @@ const render = () => {
 
 	// Disatance of text to the camera
 	// textBlock.position.y = camera.position.y * 0.9;
-	// textBlock.position.z = camera.position.z * 0.9;
+	// textBlock.position.z = camera.position.z * 0.9; 
 	// textBlock.rotation.y = camera.rotation.x * 0.9;
 	// textBlock.rotation.z = camera.rotation.y * 0.9;
 
@@ -312,7 +489,7 @@ const render = () => {
 };
 
 
-var stats = new Stats();
+const stats = new Stats();
 stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
 document.body.appendChild( stats.dom );
 
@@ -542,80 +719,6 @@ const addLettersToScene = (geometries) => {
 };
 
 
-let faceHistory = [];
-class Person {
-	constructor(face, name) {
-		this.faces = [face];
-		this.name = name;
-	}
-}
-
-class BannerHandler {
-	constructor(bannerContainer) {
-		this.dom = bannerContainer;
-		this.current = null;
-		this.persons = [];
-	}
-
-	updateCanvases(currentFaces){
-
-		let facesInView = [];
-
-		for (let name in currentFaces) {
-			facesInView.push(name);
-			let face = currentFaces[name].canvas;
-
-			var currentPerson = this.persons.find((person) => {
-				return person.name === name;
-			});
-	
-			if (!currentPerson) {
-				this.persons.push(new Person(face, name));
-				let divDom = document.createElement('div');
-				divDom.setAttribute('class', 'info-box');
-				divDom.setAttribute('data-name', name);
-				divDom.appendChild(face);
-				let label = document.createElement('div');
-				label.innerHTML = 'Name: '+ name;
-				divDom.appendChild(label);
-				this.dom.appendChild(divDom);
-			} else {
-				let divDom = document.querySelector('div.info-box[data-name='+name+']');
-				divDom.innerHTML = '';
-				divDom.appendChild(face);
-				let label = document.createElement('div');
-				label.innerHTML = 'Name: '+ name;
-				divDom.appendChild(label);
-				divDom.style.display = 'block';
-			}
-		}
-
-		// Check for displayed faces and if they're not in the cameras view, hide them
-		document.querySelectorAll('.info-box').forEach((el) => {
-			let isFaceInView = !!facesInView.find((name) => {
-				return name === el.getAttribute('data-name');
-			});
-			if (!isFaceInView) {
-				el.style.display = 'none';
-			}
-		});
-
-	}
-
-}
-
-function getRandomInt(min, max) {
-	min = Math.ceil(min);
-	max = Math.floor(max);
-	return Math.floor(Math.random() * (max - min)) + min;
-}
-
-function getRandomName(){
-	return lastNames[getRandomInt(0,198)]
-}
-
-let videoCapture;
-
 const startPlayingVideo = (device, video) => {
 	return new Promise((resolve, reject) => {
 		navigator.mediaDevices.getUserMedia({ 
@@ -735,8 +838,6 @@ async function run() {
 		video.addEventListener('loadedmetadata', evt => {
 			console.log('after loadedmetadata', Date.now() - startTime);
 
-			// videoCapture = new VideoCapture(video);
-
 			// This is fragmented because each of the steps really need to be broken up to be async
 			// and this gives me a better shot of seeing where the worst offenders are.
 			console.log('kickoff render loop');
@@ -773,11 +874,11 @@ async function run() {
 				console.log('after first render', Date.now() - startTime);
 
 				console.log('TODO start detection loop here.');
-				video.addEventListener('timeupdate', evt => {
+//				video.addEventListener('timeupdate', evt => {
 					// console.dir(video); // evt.target
 					// console.dir(evt); // evt.target
-					detect(video);
-				});
+//				});
+				setTimeout(detect, 500, video);
 	
 				requestAnimationFrame(animate);
 			});
@@ -796,149 +897,42 @@ const thumb = {
 	height: 300 * photoRatio
 };
 
+let faceHistory = [];
 function detect(video){
-	return new Promise((resolve,reject) => {
-		faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-		.withFaceLandmarks(true)
-		.withFaceDescriptors()
-		.then(detections => {
-			// found something
-			if(detections.length > 0){
-				// don't know anyone. Treat everyone as new.
-				if(faceHistory.length === 0) {
-					faceHistory = [ 
-						...faceHistory, 
-						...detections.map(detection => new faceapi.LabeledFaceDescriptors(
-							getRandomName(),
-							[detection.descriptor])
-					)];
-					resolve(faceHistory);
-				// probably know them
-				} else {
-					const faceMatcher = new faceapi.FaceMatcher(faceHistory);
-					const matches = detections.map(d => faceMatcher.matchDescriptor(d.descriptor));
-					const names = matches.map(m => m.distance > 0.6 ? getRandomName() : m.label);
-					
-					const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
 
-					const faces = detections.map(face => {
-						console.log(face.detection.box);
-						const fb = face.detection.box;
-
-						let scale = 1,
-							inverseScale = 1;
-
-						// scratch pad for math
-						let adjusted = {
-							scaledWidthPadding: 0,
-							scaledHeightPadding: 0,
-							originalWidthPadding: 0,
-							originalHeightPadding: 0
-						};
-
-						let frame = cropBounds(0,0,0,0);
-
-						// square image for portrait fill
-						// landscape image for portrait fill
-						if (fb.width === fb.height || fb.width > fb.height) {
-							// resize to fit width
-							scale = thumb.width / fb.width;
-							inverseScale = fb.width / thumb.width;
-
-							adjusted.scaledWidth = fb.width * scale;
-							adjusted.scaledWidthPadding = 0;
-							adjusted.originalWidthPadding = 0;
-
-							adjusted.scaledHeight = fb.height * scale;
-							adjusted.scaledHeightPadding = thumb.height - adjusted.scaledHeight;
-							adjusted.originalHeightPadding = (adjusted.scaledHeightPadding * inverseScale);
-
-							// calculate the new x/y w/h rect for source image using applied fill and centering logic
-							frame.x = fb.x;
-							frame.y = fb.y - (adjusted.originalHeightPadding/2); // centered capture point
-							frame.width = fb.width;
-							frame.height = fb.height + adjusted.originalHeightPadding;
-
-						// portrait image for portrait fill
-						} else {
-							// resize to fit height
-							scale = thumb.height / fb.height;
-							inverseScale = fb.height / thumb.height;
-
-							adjusted.scaledWidth = fb.width * scale;
-							adjusted.scaledWidthPadding = thumb.width - adjusted.scaledWidth;
-							adjusted.originalWidthPadding = (adjusted.scaledWidthPadding * inverseScale);
-
-							adjusted.scaledHeight = fb.height * scale;
-							adjusted.scaledHeightPadding = 0;
-							adjusted.originalHeightPadding = 0;
-
-							// calculate the new x/y w/h rect for source image using applied fill and centering logic
-							frame.x = fb.x - (adjusted.originalWidthPadding/2); // centered capture point
-							frame.y = fb.y;
-							frame.width = fb.width + adjusted.originalWidthPadding;
-							frame.height = fb.height;
-
-						}
-						console.log(fb, adjusted, frame);
-
-						frame.x = frame.x < 0 ? (()=> { console.log('x was negative', frame.x); return 0; })() : frame.x;
-						frame.y = frame.y < 0 ? (()=> { console.log('y was negative', frame.y); return 0; })() : frame.y;
-
-						// videoCrop = frame;
-						// facePosition = face.detection.box;
-						return {
-							profile: makeProfile(getRandomName(), '444-11-6666', '+1-541-754-3010', '', ''),
-							originalBox: face.detection.box,
-							croppedBox: new faceapi.Rect(frame.x, frame.y, frame.width, frame.height)
-						};
-						// document.querySelector('.main-container').appendChild(videoCapture.capture(frame));
-					});
-
-					updateFaces(faces);
-
-					// who's in the picture?
-					/*
-					faceapi.extractFaces(video, regionsToExtract).then(canvases => {
-
-						const faces = names.reduce((o, name, i) => { 
-							return { 
-								...o, [name]: {
-									'detection': detections[i],
-									'match': matches[i],
-									'canvas': canvases[i]
-								}
-							};
-						}, {});
-					
-						faceHistory = [ 
-							...faceHistory, 
-							...names.filter((name,i)=>{
-								return faces[name].match.distance > 0.6; // face match threshold
-							})
-							.map((name)=> {
-								return new faceapi.LabeledFaceDescriptors(
-									name,
-									[faces[name].detection.descriptor]
-								);
-							})
-						];
-						
-						console.log(faces);
-						bh.updateCanvases(faces);
-						resolve(faceHistory);
-					})
-					*/
-				}
+	faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+	.withFaceLandmarks(true)
+	.withFaceDescriptors()
+	.then(detections => {
+		// found something
+		if(detections.length > 0){
+			// Everyone is new. First time running through things.
+			if(faceHistory.length === 0) {
+				faceHistory = [ 
+					...faceHistory, 
+					...detections.map(detection => new faceapi.LabeledFaceDescriptors(
+						createProfileCacheEntry(detection.detection.box),
+						[detection.descriptor])
+				)];
+			// probably know someone
 			} else {
-//				console.log('No matches');
-				resolve(faceHistory);
+				const faceMatcher = new faceapi.FaceMatcher(faceHistory);
+				const matches = detections.map(d => faceMatcher.matchDescriptor(d.descriptor));
+				const names = matches.map((m,i) => { 
+					return m.distance > 0.6 ?
+						createProfileCacheEntry(detections[i].detection.box, detections[i].landmarks):
+						updateProfileCacheEntry(m.label, detections[i].detection.box, true, detections[i].landmarks);
+				});
+				faceHistory
+					.map(labeledDescriptors => labeledDescriptors.label)
+					.filter(l => names.indexOf(l)<0)
+					.forEach(deactivateProfileCacheEntry);
 			}
-		});
+		}
 	});
+	setTimeout(detect, 500, video);
 }
 
-const bh = new BannerHandler(document.querySelector('.main-container'));
 
 // yeild the thread so chrome doesn't nerf the raf
 setTimeout(run, 0);
