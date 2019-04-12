@@ -279,7 +279,7 @@ const calculateCameraPositionFromViewerPerspective = vip => {
 	const xDeltaFromCenter = xFacePos2D - (videoDims.width/2);
 	const deltaBetweenHorizontalDims = visibleBounds.width / videoDims.width;
 	const xRelativeCameraPos = deltaBetweenHorizontalDims * xDeltaFromCenter;
-	const xTargetAdjusted = xRelativeCameraPos * 0.5; // only allow it to be half the actual distance from origin
+	const xTargetAdjusted = xRelativeCameraPos * 0.35; // only allow it to be half the actual distance from origin
 
 	const yFacePos2D = mvp.boundary.y + (mvp.boundary.height/2);
 	const yDeltaFromCenter = yFacePos2D - (videoDims.height/2);
@@ -334,14 +334,14 @@ const updateCameraWithNewFacePosition = () => {
 		cameraTweens.pop().kill();
 	}
 
-	cameraTweens.push(TweenMax.to(camera.position, 1, {
+	cameraTweens.push(TweenMax.to(camera.position, 2, {
 		x: cameraTarget.x,
-		ease: Sine.easeOut, 
+		ease: Power1.easeOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
-	cameraTweens.push(TweenMax.to(camera.rotation, 1, {
+	cameraTweens.push(TweenMax.to(camera.rotation, 2, {
 		y: cameraTarget.y,
-		ease: Sine.easeOut, 
+		ease: Power1.easeOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
 
@@ -448,15 +448,8 @@ const drawAdContainer = (video) => {
 
 	const vidMesh = new THREE.Mesh( 
 		new THREE.PlaneBufferGeometry( 2, 2, 1, 1 ), 
-		new THREE.MeshPhysicalMaterial({
+		new THREE.MeshBasicMaterial({
 			map: vidMap,
-			transparent: false,
-			opacity: 1,
-			metalness: 0.2,
-			roughness: 0.9,
-			reflectivity: 0.3,
-			clearCoat: 0.5,
-			clearCoatRoughness: 0.5,
 			color: 0xFFFFFF
 		})
 	);
