@@ -928,7 +928,7 @@ async function run() {
 					// console.dir(video); // evt.target
 					// console.dir(evt); // evt.target
 //				});
-				setTimeout(detect, 200, video);
+				setTimeout(detect, 100, video);
 	
 				requestAnimationFrame(animate);
 			});
