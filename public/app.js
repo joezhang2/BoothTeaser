@@ -304,21 +304,35 @@ const updateCameraWithNewFacePosition = (faces) => {
 	// Center point before - center point after = distance;
 	const xFacePos2D = mvp.boundary.x + (mvp.boundary.width/2);
 	const xDeltaFromCenter = xFacePos2D - (videoDims.width/2);
-	const deltaBetweenDims = visibleBounds.width / videoDims.width;
-	const xRelativeCameraPos = deltaBetweenDims * xDeltaFromCenter;
+	const deltaBetweenHorizontalDims = visibleBounds.width / videoDims.width;
+	const xRelativeCameraPos = deltaBetweenHorizontalDims * xDeltaFromCenter;
 	const xTargetAdjusted = xRelativeCameraPos * 0.5; // only allow it to be half the actual distance from origin
 
-	console.log({xFacePos2D,xDeltaFromCenter,deltaBetweenDims,xRelativeCameraPos});
+	const yFacePos2D = mvp.boundary.y + (mvp.boundary.height/2);
+	const yDeltaFromCenter = yFacePos2D - (videoDims.height/2);
+	const deltaBetweenVerticalDims = visibleBounds.height / videoDims.height;
+	const yRelativeCameraPos = deltaBetweenVerticalDims * yDeltaFromCenter;
+	const yTargetAdjusted = yRelativeCameraPos * 0.5; // only allow it to be half the actual distance from origin
+
+	console.log({xFacePos2D,xDeltaFromCenter,deltaBetweenHorizontalDims,xRelativeCameraPos,xTargetAdjusted});
+	console.log({yFacePos2D,yDeltaFromCenter,deltaBetweenVerticalDims,yRelativeCameraPos,yTargetAdjusted});
 
 	if (cameraTweens.length) {
 		cameraTweens.pop().kill();
 		// cameraTweens.pop().kill();
 	}
+
 	cameraTweens.push(TweenMax.to(camera.position, 0.5, {
 		x: xTargetAdjusted,
 		ease: Power2.easeInOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
+	cameraTweens.push(TweenMax.to(camera.rotation, 0.5, {
+		y: yTargetAdjusted,
+		ease: Power2.easeInOut, 
+		onComplete: ()=>{console.log('finished tween', camera.position.x)}
+	}));
+
 	// cameraTweens.push(TweenMax.to(camera.position, 0.5, {y, ease: Power2.easeInOut}));
 
 	if (videoCropTweens.length) {
