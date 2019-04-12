@@ -282,19 +282,40 @@ const updateCameraWithNewFacePosition = (faces) => {
 
 	mvp = vip;
 	
-	// center point before - center point after = distance;
-	// Mouse logic: (pageCenterDims.width - e.pageX) * 0.01
-	// Face logic: (face.x + (face.width/2)) / video width = % of 100 for range between two times
-	let pctX = ((mvp.boundary.x + (mvp.boundary.width/2)) / videoDims.width);
-	let x2d = pctX * (visibleBounds.width/2);
-	console.log('percent x', pctX, 'actual x', x2d, 'visible width', visibleBounds.width, 'canvas width', canvas.width);
+	//	2D math
+	//	|--------------------------------------------------|	x max = video width
+	//	|---------------------------|							x center = video width/2
+	//	|														x origin = 0
+	//	|								   .____|___.
+	//	|----------------------------------| ( 0_0) |			x face pos = face.x + (face.width/2) = face center
+	//	|								   +----|---+
+	//								|-----------|				x delta from center = face pos - (video width/2)
+	//															delta from center = (face pos - (video width/2))/(video width/2)
+
+	//
+	//	3D math
+	//	|--------------------------------------------------|	x max = visible bounds/2
+	//	|---------------------------|							x center = 0
+	//	|														x origin = (visible bounds/2) * -1
+	//
+	//															delta between 2D and 3D = visible bounds / video width
+	//															x relative camera position = dim delta * x delta from center
+
+	// Center point before - center point after = distance;
+	const xFacePos2D = mvp.boundary.x + (mvp.boundary.width/2);
+	const xDeltaFromCenter = xFacePos2D - (videoDims.width/2);
+	const deltaBetweenDims = visibleBounds.width / videoDims.width;
+	const xRelativeCameraPos = deltaBetweenDims * xDeltaFromCenter;
+	const xTargetAdjusted = xRelativeCameraPos * 0.5; // only allow it to be half the actual distance from origin
+
+	console.log({xFacePos2D,xDeltaFromCenter,deltaBetweenDims,xRelativeCameraPos});
 
 	if (cameraTweens.length) {
 		cameraTweens.pop().kill();
 		// cameraTweens.pop().kill();
 	}
 	cameraTweens.push(TweenMax.to(camera.position, 0.5, {
-		x: x2d,
+		x: xTargetAdjusted,
 		ease: Power2.easeInOut, 
 		onComplete: ()=>{console.log('finished tween', camera.position.x)}
 	}));
@@ -927,6 +948,35 @@ function detect(video){
 					.map(labeledDescriptors => labeledDescriptors.label)
 					.filter(l => names.indexOf(l)<0)
 					.forEach(deactivateProfileCacheEntry);
+
+				const regionsToExtract = detections.map(faceDetection => faceDetection.detection.box);
+
+				faceapi.extractFaces(video, regionsToExtract).then(canvases => {
+
+					const faces = names.reduce((o, name, i) => { 
+						return { 
+							...o, [name]: {
+								'detection': detections[i],
+								'match': matches[i],
+								'canvas': canvases[i]
+							}
+						};
+					}, {});
+				
+					faceHistory = [ 
+						...faceHistory, 
+						...names.filter((name,i)=>{
+							return faces[name].match.distance > 0.6; // face match threshold
+						})
+						.map((name)=> {
+							return new faceapi.LabeledFaceDescriptors(
+								name,
+								[faces[name].detection.descriptor]
+							);
+						})
+					];
+					
+				});
 			}
 		}
 	});
