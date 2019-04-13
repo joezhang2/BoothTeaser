@@ -105,7 +105,7 @@ const start3d = () => {
 		
 		const fogColor = new THREE.Color(0x000000);
 		scene.background = fogColor;
-//		scene.fog = new THREE.Fog(fogColor, 20, 65);	
+		scene.fog = new THREE.Fog(fogColor, 20, 65);	
 
 		// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
 		camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 2000); // 40
@@ -321,7 +321,7 @@ const updateCameraWithNewFacePosition = () => {
 			idleCameraTimeout = setTimeout(() => {
 				cameraTarget = {x:0,y:0};
 				updateCameraWithNewFacePosition();
-			}, 500);
+			}, 10000);
 		}
 	} else {
 		if (idleCameraTimeout) { clearTimeout(idleCameraTimeout); idleCameraTimeout = null; }
@@ -337,12 +337,12 @@ const updateCameraWithNewFacePosition = () => {
 	cameraTweens.push(TweenMax.to(camera.position, 2, {
 		x: cameraTarget.x,
 		ease: Power1.easeOut, 
-		onComplete: ()=>{console.log('finished tween', camera.position.x)}
+		onComplete: () => {console.log('finished tween', camera.position.x)}
 	}));
 	cameraTweens.push(TweenMax.to(camera.rotation, 2, {
 		y: cameraTarget.y,
 		ease: Power1.easeOut, 
-		onComplete: ()=>{console.log('finished tween', camera.position.x)}
+		onComplete: () => {console.log('finished tween', camera.position.x)}
 	}));
 
 	// cameraTweens.push(TweenMax.to(camera.position, 0.5, {y, ease: Power2.easeInOut}));
@@ -462,7 +462,7 @@ const drawAdContainer = (video) => {
 		new THREE.MeshPhysicalMaterial({ // this should probably be basic
 			color: new THREE.Color(0x2277FF),
 			transparent: true,
-			opacity: 0.1,
+			opacity: 0.2,
 			metalness: 1,
 			roughness: 0.5,
 			reflectivity: 1,
@@ -524,7 +524,7 @@ const render = () => {
 	light.rotation.x = camera.rotation.x;
 	light.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * 0.02;
 
-	light.position.x = camera.position.x * 10;
+	light.position.x = camera.position.x * 5;
 	light.position.y = camera.position.y * 1.5;
 	light.position.z = camera.position.z * 1.5;
 
@@ -537,7 +537,7 @@ const render = () => {
 
 const stats = new Stats();
 stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-document.body.appendChild( stats.dom );
+// document.body.appendChild( stats.dom );
 
 const animate = () => {
 	stats.begin();
@@ -646,7 +646,7 @@ const createMaterial = (color) => {
 
 const drawSomething = () => {
 
-	const demoConfig = {
+	const config = {
 		maxWidth: 90,
 		xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
 		numWidthIncrement: 45,
@@ -655,7 +655,7 @@ const drawSomething = () => {
 		numRadiusIncrements: 20
 	};
 
-	const config = {
+	const Xonfig = {
 		maxWidth: 90,
 		xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
 		numWidthIncrement: 15,
@@ -994,13 +994,13 @@ const detect = video => {
 			// when there are no faces detected, filter the profile cache to active users and deactivate just those users
 			let activePersons = [];
 			labeledDescriptors.forEach(descriptor => {
-				activePersons.concat(profileCache.filter(person => {
+				activePersons = activePersons.concat(profileCache.filter(person => {
 					if (descriptor.label === person.uuid && person.active) {
 						return true;
 					}
 				}));
 			})
-			
+			console.log('***** These are the active persons that should be marked as inactive', activePersons);
 			activePersons.reduce((x, y) => x.includes(y) ? x : [...x, y], []).forEach(person => {
 				console.log('This person was deemed unfit for focus', person.uuid);
 				deactivateProfileCacheEntry(person.uuid);
