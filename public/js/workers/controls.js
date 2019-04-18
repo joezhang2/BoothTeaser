@@ -18,10 +18,9 @@ const init = (global) => {
 	window.URL = self.URL;
 	window.indexedDB = self.indexedDB;
 	window.location = self.location;
-	window.localStorage = self.localStorage;
 	
 	document = {
-		createElement: () => {
+		createElement: (element) => {
 			switch(element) {
 				case 'canvas':
 					const canvas = new OffscreenCanvas(1,1);
