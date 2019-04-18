@@ -1,5 +1,5 @@
 // Browser driver support specifics
-var canvas, context;
+var domCanvas, canvas, context;
 
 // Renderer specifics
 var camera, scene, renderer, light;
@@ -43,13 +43,16 @@ const MODELS_PATH = '/public/models';
 const lastNames = ['SMITH','JOHNSON','WILLIAMS','BROWN','JONES','MILLER','DAVIS','GARCIA','RODRIGUEZ','WILSON','MARTINEZ','ANDERSON','TAYLOR','THOMAS','HERNANDEZ','MOORE','MARTIN','JACKSON','THOMPSON','WHITE','LOPEZ','LEE','GONZALEZ','HARRIS','CLARK','LEWIS','ROBINSON','WALKER','PEREZ','HALL','YOUNG','ALLEN','SANCHEZ','WRIGHT','KING','SCOTT','GREEN','BAKER','ADAMS','NELSON','HILL','RAMIREZ','CAMPBELL','MITCHELL','ROBERTS','CARTER','PHILLIPS','EVANS','TURNER','TORRES','PARKER','COLLINS','EDWARDS','STEWART','FLORES','MORRIS','NGUYEN','MURPHY','RIVERA','COOK','ROGERS','MORGAN','PETERSON','COOPER','REED','BAILEY','BELL','GOMEZ','KELLY','HOWARD','WARD','COX','DIAZ','RICHARDSON','WOOD','WATSON','BROOKS','BENNETT','GRAY','JAMES','REYES','CRUZ','HUGHES','PRICE','MYERS','LONG','FOSTER','SANDERS','ROSS','MORALES','POWELL','SULLIVAN','RUSSELL','ORTIZ','JENKINS','GUTIERREZ','PERRY','BUTLER','BARNES','FISHER','HENDERSON','COLEMAN','SIMMONS','PATTERSON','JORDAN','REYNOLDS','HAMILTON','GRAHAM','KIM','GONZALES','ALEXANDER','RAMOS','WALLACE','GRIFFIN','WEST','COLE','HAYES','CHAVEZ','GIBSON','BRYANT','ELLIS','STEVENS','MURRAY','FORD','MARSHALL','OWENS','MCDONALD','HARRISON','RUIZ','KENNEDY','WELLS','ALVAREZ','WOODS','MENDOZA','CASTILLO','OLSON','WEBB','WASHINGTON','TUCKER','FREEMAN','BURNS','HENRY','VASQUEZ','SNYDER','SIMPSON','CRAWFORD','JIMENEZ','PORTER','MASON','SHAW','GORDON','WAGNER','HUNTER','ROMERO','HICKS','DIXON','HUNT','PALMER','ROBERTSON','BLACK','HOLMES','STONE','MEYER','BOYD','MILLS','WARREN','FOX','ROSE','RICE','MORENO','SCHMIDT','PATEL','FERGUSON','NICHOLS','HERRERA','MEDINA','RYAN','FERNANDEZ','WEAVER','DANIELS','STEPHENS','GARDNER','PAYNE','KELLEY','DUNN','PIERCE','ARNOLD','TRAN','SPENCER','PETERS','HAWKINS','GRANT','HANSEN','CASTRO','HOFFMAN','HART','ELLIOTT','CUNNINGHAM','KNIGHT'];
 const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+
 const minMaxRand = (min, max) => {
 	return Math.random() * (max - min) + min;
 };
 
+
 const rads = (degrees) => {
 	return THREE.Math.degToRad(degrees); //  * Math.PI / 180;
 };
+
 
 const getVisibleBounds = (depth, camera) => {
 	const visibleHeightAtZDepth = ( depth, camera ) => {
@@ -75,6 +78,24 @@ const getVisibleBounds = (depth, camera) => {
 		height: visibleHeightAtZDepth(depth, camera)
 	};
 };
+
+
+const loadImageBitmap = (path, options) => {
+	return new Promise((resolve, reject) => {
+		var loader = new THREE.ImageBitmapLoader();
+
+		//ex: imageOrientation: 'flipY' 
+		if (options) { loader.setOptions(options); }
+	
+		loader.load(
+			path,
+			imageBitmap => { console.log('loaded', path, imageBitmap); setTimeout(resolve, 0, imageBitmap); },
+			()=>{ console.log('progress', path); },
+			err => { console.log('error', path, err); reject(err); }
+		);
+	});
+};
+
 
 const start3d = () => {
 	return new Promise((resolve,reject) => {
@@ -114,8 +135,10 @@ const start3d = () => {
 //		camera.matrixAutoUpdate = false;
 
 		// WebGL 2 looks to be supported in Chrome and FF, but not in Safari Tech Preview very well.
-		canvas = document.createElement('canvas');
-		canvas.style.background = '#000000';
+		domCanvas = document.createElement('canvas');
+		domCanvas.style.background = '#000000';
+		canvas = domCanvas.transferControlToOffscreen();
+		canvas.style = { width: 0, height: 0 };
 		context = canvas.getContext('webgl2'); // webgl2 for that engine
 		renderer = new THREE.WebGLRenderer({
 			canvas: canvas,
@@ -137,7 +160,7 @@ const start3d = () => {
 
 		// scene.updateMatrix();
 
-		document.body.appendChild(renderer.domElement);
+		document.body.appendChild(domCanvas);
 		
 //		document.body.addEventListener('mousemove', onMouseMove);
 		window.addEventListener('resize', onWinResize);
@@ -537,11 +560,12 @@ const render = () => {
 
 const stats = new Stats();
 stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-// document.body.appendChild( stats.dom );
+ document.body.appendChild( stats.dom );
 
 const animate = () => {
 	stats.begin();
 	render();
+	
 	stats.end();
 
 	requestAnimationFrame(animate);
@@ -1007,7 +1031,7 @@ const detect = video => {
 			});
 		}
 		// setTimeout was here
-		setTimeout(detect, 200, video);
+//		setTimeout(detect, 200, video);
 	}).catch(err => {
 		console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 		console.error('badness in the face detction. could not detect. exiting app.');
