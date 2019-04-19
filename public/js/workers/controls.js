@@ -35,6 +35,8 @@ const init = (global) => {
 	};
 
 	importScripts(
-		'/js/libs/face-api.js'
+		'/js/libs/face-api.js',
+		'/js/workers/controls/face-tracking.js',
+		'/js/workers/controls/gesture-tracking.js'
 	);
 }
