@@ -38,21 +38,20 @@ onmessage = (event) => {
 			'/js/libs/three.js',
 			'/js/libs/BufferGeometryUtils.js',
 		//	'/js/libs/GeometryUtils.js',
+			'/js/libs/TweenMax.js',
 			'/js/workers/visuals/ui.js'
 		);
-
 
 		ui = new UserInterface(THREE, event.data.uiCanvas);
 		ui.start3d(appDims.width, appDims.height);
 
-		postMessage({yo: 'started up'});
+		postMessage({yo: 'started up visuals.js'});
 	} else if (ui) {
 		switch (event.data.route) {
 			case 'perspectiveUpdate':
-//				ui.updatePerspective(event.data.x,event.data.y,event.data.z);
+				ui.updatePerspective(event.data.x,event.data.y,event.data.z);
 			default:
 				postMessage({yo: 'had issues, dont even know what to do with this:' + event.data.route });
-				console.log('lol');
 		}
 	} else {
 		console.log('the world isnt ready for', event);

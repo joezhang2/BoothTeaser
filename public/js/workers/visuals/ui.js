@@ -80,7 +80,7 @@ function UserInterface(THREE, canvas) {
 			scene.fog = new THREE.Fog(fogColor, 20, 65);	
 
 			// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-			camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 2000); // 40
+			camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 200); // 40
 			visibleBounds = getVisibleBounds(50, camera);
 
 	//		camera.matrixAutoUpdate = false;
@@ -190,6 +190,48 @@ function UserInterface(THREE, canvas) {
 		scene.add( adContainer );
 	};
 
+	let cameraTweens = [];
+	let cameraTarget = {x:0,y:0,z:0};
+
+	const rateOfTravel = {
+		x: 500 / 1000,
+		y: Math.PI / 1000,
+		z: Math.PI / 1000
+	}
+
+	this.updatePerspective = (x,y,z) => {
+
+		cameraTarget.x = x;
+		cameraTarget.y = y;
+		cameraTarget.z = z;
+
+		// Calculate duration using expected distance traveled over time. 
+		// Math.abs(Point A - Point B) = actual distance
+		// expected distance / expected time in s = expected rate of travel per s
+		// actual distance * expected rate = actual time
+		const xDuration = Math.abs(x - camera.position.x) * rateOfTravel.x
+		const yDuration = Math.abs(y - camera.rotation.y) * rateOfTravel.y
+
+		if (cameraTweens.length) {
+			cameraTweens.pop().kill();
+			cameraTweens.pop().kill();
+		}
+	
+		cameraTweens.push(TweenMax.to(camera.position, xDuration, {
+			x: cameraTarget.x,
+			ease: Power1.easeOut, 
+			onComplete: () => {console.log('finished tween', camera.position.x)}
+		}));
+
+		cameraTweens.push(TweenMax.to(camera.rotation, yDuration, {
+			y: cameraTarget.y,
+			ease: Power1.easeOut, 
+			onComplete: () => {console.log('finished tween', camera.rotation.y)}
+		}));
+	};
+
+	let busySemaphore = false;
+
 	// This is stuff that could happen at any interval driven by any animation loop (tweenmax for instance, or just a timeout, or raf)
 	const render = () => {
 		
@@ -229,95 +271,163 @@ function UserInterface(THREE, canvas) {
 
 	// this is the use of raf (if it even works in a worker)
 	const animate = () => {
-		render();
+		let st = Date.now();
 
-		requestAnimationFrame(animate); // what should i replace this will? I think raf is supported, but is it?
+		if (busySemaphore) {
+			console.log('renderer busy, waiting...');
+			requestAnimationFrame(()=>{
+				console.log('raf', Date.now() - st);
+				animate();
+			});
+			return;
+		}
+		busySemaphore = true;
+		setTimeout(()=>{
+			render();
+			busySemaphore = false;
+		}, 0);
+
+		requestAnimationFrame(()=>{
+			console.log('raf', Date.now() - st);
+			animate();
+		});
+		// setTimeout(()=>{
+		// 	console.log('raf', performance.now() - st);
+		// 	animate();
+		// }, 16); // what should i replace this will? I think raf is supported, but is it?
 	};
-
 
 	const posRandRate = 0.9;
 
 	const generatePlantedForest = (xPosition, maxWidth, numWidthIncrement, maxRadius, minRadius, numRadiusIncrements) => {
 		
+		let points = [];
+		const twoPi = 2 * Math.PI;
+		let circumference,
+			startingAngle,
+			endingAngle;
+
 		const calculateRandomAngleInArc = (minArcLength, maxArcLength, radius) => {
-			const circumference = 2 * Math.PI * radius;
-			const startingAngle = 2 * Math.PI * minArcLength / circumference;
-			const endingAngle = 2 * Math.PI * maxArcLength / circumference;
-			
+			circumference = twoPi * radius;
+			startingAngle = twoPi * minArcLength / circumference;
+			endingAngle = twoPi * maxArcLength / circumference;
 			return posRandRate * Math.random() * (endingAngle - startingAngle) + startingAngle;
 		}
 		
+		let angle;
+
 		const generateRandomPointOnArc = (currentRadius, minArcLength, maxArcLength, arcRadius) => {
-			const angle = calculateRandomAngleInArc(minArcLength, maxArcLength, arcRadius);
-			
+			angle = calculateRandomAngleInArc(minArcLength, maxArcLength, arcRadius);
 			return {
 				y: currentRadius * Math.sin(angle),
 				z: currentRadius * Math.cos(angle)
 			};
 		}
-		
+
+		let radius,
+			pointOnArc;
+
 		const generatePoint = (leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance) => {
-			let x, y, z;
-			const radius = minRadius + (maxRadius - minRadius) * Math.random() * posRandRate;
+			radius = minRadius + (maxRadius - minRadius) * Math.random() * posRandRate;
 			
-			const pointOnArc = generateRandomPointOnArc(radius, currentMinArc, currentMaxArc, minRadius);
-			
-			x = (widthVariance ? widthOffset * posRandRate * Math.random() : 0)+ leftWidthBoundary;
-			y = pointOnArc.y;
-			z = pointOnArc.z;
-			return {x: x, y: y, z: z};
+			pointOnArc = generateRandomPointOnArc(radius, currentMinArc, currentMaxArc, minRadius);
+
+			return new Promise((resolve, reject) => {
+				points.push({ 
+					x: (widthVariance ? widthOffset * posRandRate * Math.random() : 0)+ leftWidthBoundary,
+					y: pointOnArc.y,
+					z: pointOnArc.z
+				});
+				resolve(); // point
+			});
 		}
 		
+		let numMinArcSteps,
+			minArcIncrement,
+			currentMinArc,
+			currentMaxArc,
+			currentArcIncrement;
+
 		const generateRing = (leftWidthBoundary, widthOffset, minRadius, maxRadius, widthVariance) => {
-			const numMinArcSteps = Math.ceil((minRadius * 2 * Math.PI) / (widthOffset));
-			const minArcIncrement = (minRadius * 2 * Math.PI) / numMinArcSteps;
-			
-			let vertices = [];
-			
-			for (let currentArcIncrement = 0; currentArcIncrement < numMinArcSteps; currentArcIncrement++) {
-				let currentMinArc = currentArcIncrement * minArcIncrement;
-				let currentMaxArc = currentMinArc + minArcIncrement;
-				
-				vertices.push(generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance));
-			}
-			return vertices;
+			return new Promise((resolve, reject)=>{
+				setTimeout(()=>{
+					numMinArcSteps = Math.ceil((minRadius * twoPi) / (widthOffset));
+					minArcIncrement = (minRadius * twoPi) / numMinArcSteps;
+					
+					let promises = [];
+
+					for (currentArcIncrement = 0; currentArcIncrement < numMinArcSteps; currentArcIncrement++) {
+						currentMinArc = currentArcIncrement * minArcIncrement;
+						currentMaxArc = currentMinArc + minArcIncrement;
+						
+						promises.push(generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance));
+					}
+		
+					Promise.all(promises).then(()=>{ // verticies
+//						console.log('generateRing',vertices);
+						resolve(); // vertices
+					});
+				},0);
+			})
 		}
 		
+		let radiusIncrement,
+			currentRadius;
+
 		const generateDisk = (leftWidthBoundary, widthOffset, maxRadius, minRadius, numRadiusIncrements, widthVariance) => {
-			const radiusIncrement = (maxRadius - minRadius)/ numRadiusIncrements;
-			let vertices = [];
-			
-			//Generate points on inner diameter
-			vertices = vertices.concat(generateRing(leftWidthBoundary, widthOffset, minRadius, minRadius, widthVariance));
-			
-			// Generate points inside ring
-			for(let currentRadius = minRadius; currentRadius < maxRadius; currentRadius += radiusIncrement) {
-				vertices = vertices.concat(generateRing(leftWidthBoundary, widthOffset, currentRadius, currentRadius + radiusIncrement, widthVariance));
-			}
-			//Generate points on outer diameter
-			vertices = vertices.concat(generateRing(leftWidthBoundary, widthOffset, maxRadius, maxRadius, widthVariance));
-			
-			return vertices;
+			return new Promise((resolve, reject) => {
+				setTimeout(()=>{
+					radiusIncrement = (maxRadius - minRadius)/ numRadiusIncrements;
+		
+					let promises = [];
+					//Generate points on inner diameter
+					promises.push(generateRing(leftWidthBoundary, widthOffset, minRadius, minRadius, widthVariance));
+					// Generate points inside ring
+					for(currentRadius = minRadius; currentRadius < maxRadius; currentRadius += radiusIncrement) {
+						promises.push(generateRing(leftWidthBoundary, widthOffset, currentRadius, currentRadius + radiusIncrement, widthVariance));
+					}
+					//Generate points on outer diameter
+					promises.push(generateRing(leftWidthBoundary, widthOffset, maxRadius, maxRadius, widthVariance));
+					
+					Promise.all(promises).then(() => { // pointArrays
+						// let vertices = [];
+						// pointArrays.forEach(ring=>{
+						// 	vertices = [...vertices, ...ring];
+						// });
+						// console.log('generateDisk',vertices);
+						resolve(); // vertices
+					});
+				},0);
+			});
 		}
 
 		return new Promise((resolve,reject) => {
 			const widthIncrement = maxWidth / numWidthIncrement;
 			const endWith = xPosition + maxWidth;
 			
-			let vertices = [];
 			let startTime = Date.now();
-			vertices = vertices.concat(generateDisk(xPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false));
-			console.log('after vertices.concat(generateDisk', Date.now() - startTime);
+			setTimeout(()=>{
+				let firstSet = generateDisk(xPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false);
+	
+				let promises = [];
+				for(let currentXPosition = xPosition; currentXPosition < endWith; currentXPosition += widthIncrement) {
+					promises = [...promises, generateDisk(currentXPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, true)];
+				}
+				
+				let lastSet = generateDisk(endWith, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false);
+				console.log('after last promise chain', Date.now() - startTime);
 
-			for(let currentXPosition = xPosition; currentXPosition < endWith; currentXPosition += widthIncrement) {
-				vertices = vertices.concat(generateDisk(currentXPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, true));
-			}
-			console.log('after for(let currentXPosition', Date.now() - startTime);
-			
-			vertices = vertices.concat(generateDisk(endWith, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false));
-			console.log('after last vertices.concat(generateDisk', Date.now() - startTime);
+				Promise.all([firstSet, ...promises, lastSet]).then(() => { // pointArrays
+					console.log('generatePlantedForest', Date.now() - startTime);
 
-			setTimeout(resolve, 0, vertices);
+					// let vertices = [];
+					// pointArrays.forEach(disk=>{
+					// 	vertices = [...vertices, ...disk];
+					// });
+					// console.log('generateDisk',vertices);
+					resolve(points); // vertices
+				});
+			},0);
 		});
 	};
 
@@ -379,50 +489,71 @@ function UserInterface(THREE, canvas) {
 			const fontSize = .3,
 				possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-			let letterShapeGeoms = [];
+			let letterShapeGeoms = [],
+				promises = [],
+				geometry;
 
 			for (let i = 0; possible.length > i; i++) {
-				let geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
-				geometry.computeBoundingBox();
-				geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
-				letterShapeGeoms[i] = geometry;
+				promises.push(new Promise((resolve, reject)=>{
+					setTimeout(()=>{
+						geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
+						geometry.computeBoundingBox();
+						geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
+						letterShapeGeoms[i] = geometry;
+						resolve();
+					},0);
+				}));
 			}
-			// 
-			setTimeout(resolve, 0, letterShapeGeoms);
+			
+			Promise.all(promises).then(()=>{
+				resolve(letterShapeGeoms);
+			});
 		});
 	};
 
 	const generateGeometries = (letterShapeGeoms, points, midway) => {
 		return new Promise((resolve,reject) => {
-			let geometries = {};
+			let geometries = {},
+				rotY,
+				letterPos,
+				newGeom;
+			
+			const halfPi = Math.PI/2;
 
-			points.forEach((pos) => {
-				let rotY;
-				if (pos.x < midway - 20){
-					rotY = 1;
-				} else if (pos.x > midway + 20) {
-					rotY = -1;
-				} else {
-					rotY = 0;
-				}
+			let promises = [];
 
-				let letterPos = Math.floor(Math.random() * letterShapeGeoms.length);
-
-				if (!geometries[rotY]) { geometries[rotY] = {}; }
-				if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
-
-				let newGeom = letterShapeGeoms[letterPos].clone();
-
-				newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * Math.PI/2);
-		//		newGeom.rotateY(rotY);
-				// plane.rotation.y = plane.rotation.y + rotY;
-				newGeom.translate( pos.x, pos.y, pos.z );
-
-				geometries[rotY][letterPos].push(newGeom);
+			points.forEach(pos => {
+				promises.push(new Promise((resolve, reject)=>{
+					setTimeout(()=>{
+						if (pos.x < midway - 20){
+							rotY = 1;
+						} else if (pos.x > midway + 20) {
+							rotY = -1;
+						} else {
+							rotY = 0;
+						}
+		
+						letterPos = Math.floor(Math.random() * letterShapeGeoms.length);
+		
+						if (!geometries[rotY]) { geometries[rotY] = {}; }
+						if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
+		
+						newGeom = letterShapeGeoms[letterPos].clone();
+		
+						newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * halfPi);
+				//		newGeom.rotateY(rotY);
+						// plane.rotation.y = plane.rotation.y + rotY;
+						newGeom.translate( pos.x, pos.y, pos.z );
+		
+						geometries[rotY][letterPos].push(newGeom);
+						resolve();
+					},0);
+				}));
 			});
 
-			// addLettersToScene
-			setTimeout(resolve, 0, geometries);
+			Promise.all(promises).then(()=>{
+				resolve(geometries);
+			});
 		});
 	};
 
