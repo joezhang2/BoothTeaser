@@ -485,21 +485,26 @@ function UserInterface(THREE, canvas) {
 	};
 
 	const generateMaterials = (font) => {
+		const fontSize = .3,
+			possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+		let letterShapeGeoms = [],
+			promises = [],
+			geometry,
+			shape,
+			i;
+
 		return new Promise((resolve,reject) => {
-			const fontSize = .3,
-				possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-			let letterShapeGeoms = [],
-				promises = [],
-				geometry;
-
-			for (let i = 0; possible.length > i; i++) {
+			for (i = 0; possible.length > i; i++) {
 				promises.push(new Promise((resolve, reject)=>{
+					let x = i;
 					setTimeout(()=>{
-						geometry = new THREE.ShapeBufferGeometry(font.generateShapes(possible[i], fontSize));
+						shape = font.generateShapes(possible[x], fontSize);
+						geometry = new THREE.ShapeBufferGeometry(shape);
 						geometry.computeBoundingBox();
 						geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
-						letterShapeGeoms[i] = geometry;
+						letterShapeGeoms[x] = geometry;
 						resolve();
 					},0);
 				}));
@@ -551,8 +556,11 @@ function UserInterface(THREE, canvas) {
 				}));
 			});
 
+			
 			Promise.all(promises).then(()=>{
-				resolve(geometries);
+				setTimeout(()=> {
+					resolve(geometries);
+				},5000); // give chrome a minute to just catch its breath
 			});
 		});
 	};
@@ -564,21 +572,22 @@ function UserInterface(THREE, canvas) {
 			'1': createMaterial(0x2277FF)
 		};
 
+		console.log('start add letters to scene');
 		return new Promise((resolve,reject) => {
 			for(let rotY in geometries) {
 				let letterGroups = geometries[rotY];
 				for(let index in letterGroups) {
 					let geoms = letterGroups[index],
 						mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
-					// mesh.updateMatrix();
-					// mesh.matrixAutoUpdate = false;
+					mesh.updateMatrix();
+					mesh.matrixAutoUpdate = false;
 					// mesh.rotation.x = mesh.rotation.x;
 					// mesh.rotation.y = mesh.rotation.y;
 					scene.add(mesh);
 				}
 			}
 			
-			setTimeout(resolve, 0, {});
+			setTimeout(resolve, 0);
 		});
 	}
 
