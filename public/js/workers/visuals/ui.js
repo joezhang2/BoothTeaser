@@ -337,7 +337,7 @@ function UserInterface(THREE, canvas) {
 
 			return new Promise((resolve, reject) => {
 				points.push({ 
-					x: (widthVariance ? widthOffset * posRandRate * Math.random() : 0)+ leftWidthBoundary,
+					x: ((widthVariance ? widthOffset * posRandRate * Math.random() : 0)+ leftWidthBoundary),
 					y: pointOnArc.y,
 					z: pointOnArc.z
 				});
@@ -439,10 +439,11 @@ function UserInterface(THREE, canvas) {
 
 	const createPoints = () => {
 
+		// this works for non-rasterized fonts. Should still work on rasterized fonts
 		const Xonfig = {
 			maxWidth: 90,
 			xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
-			numWidthIncrement: 45,
+			numWidthIncrement: 30,
 			maxRadius: 45,
 			minRadius: 20,
 			numRadiusIncrements: 20
@@ -451,10 +452,10 @@ function UserInterface(THREE, canvas) {
 		const config = { // this is the dev config because it starts up faster, so your refreshes arent slow
 			maxWidth: 90,
 			xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
-			numWidthIncrement: 25,
+			numWidthIncrement: 30,
 			maxRadius: 45,
 			minRadius: 20,
-			numRadiusIncrements: 10
+			numRadiusIncrements: 5
 		};
 
 		return new Promise(resolve => {
@@ -507,9 +508,9 @@ function UserInterface(THREE, canvas) {
 
 		return new Promise(resolve => {
 			spaceWorkOut(points, (pos)=>{
-				if (pos.x < midway - 20){
+				if (pos.x < midway - 15){
 					rotY = 2;
-				} else if (pos.x > midway + 20) {
+				} else if (pos.x > midway + 15) {
 					rotY = 0;
 				} else {
 					rotY = 1;
@@ -537,9 +538,9 @@ function UserInterface(THREE, canvas) {
 
 	const addLettersToScene = (geometries) => {
 		const colors = [
-			createMaterial(0xFF7722),
-			createMaterial(0x222222),
-			createMaterial(0x2277FF)
+			createMaterial(0xFF0000),
+			createMaterial(0x333333),
+			createMaterial(0x0000FF)
 		];
 
 		let mesh,

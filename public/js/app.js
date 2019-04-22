@@ -80,7 +80,7 @@ body.appendChild(startButton);
 
 const stats = new window.Stats(); // included by index.html
 stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-body.appendChild( stats.dom );
+//body.appendChild( stats.dom );
 
 const raf = ()=>{
 	stats.begin();
