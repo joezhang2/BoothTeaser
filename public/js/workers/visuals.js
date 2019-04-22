@@ -45,7 +45,7 @@ onmessage = (event) => {
 		ui = new UserInterface(THREE, event.data.uiCanvas);
 		ui.start3d(appDims.width, appDims.height);
 
-		postMessage({yo: 'started up visuals.js'});
+		postMessage({route: 'initialized'});
 	} else if (ui) {
 		switch (event.data.route) {
 			case 'perspectiveUpdate':

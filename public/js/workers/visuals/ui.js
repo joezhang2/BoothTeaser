@@ -104,7 +104,7 @@ function UserInterface(THREE, canvas) {
 			scene.fog = new THREE.Fog(fogColor, 20, 65);	
 
 			// PerspectiveCamera( fov : Number, aspect : Number, near : Number, far : Number )
-			camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 200); // 40
+			camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 70);
 			visibleBounds = getVisibleBounds(50, camera);
 
 	//		camera.matrixAutoUpdate = false;
@@ -455,7 +455,7 @@ function UserInterface(THREE, canvas) {
 			numWidthIncrement: 30,
 			maxRadius: 45,
 			minRadius: 20,
-			numRadiusIncrements: 5
+			numRadiusIncrements: 10
 		};
 
 		return new Promise(resolve => {
@@ -520,7 +520,6 @@ function UserInterface(THREE, canvas) {
 
 				if (!geometries[rotY]) { geometries[rotY] = []; }
 				if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
-				console.log(rotY, letterPos);
 
 				newGeom = letterShapeGeoms[letterPos].clone();
 
@@ -550,11 +549,8 @@ function UserInterface(THREE, canvas) {
 
 		console.log('start add letters to scene', Date.now() - startTime);
 		return new Promise(resolve => {
-			console.log('kickoff', geometries);
 			spaceWorkOut(geometries, (letterGroups, rotIndex)=>{
-				console.log('loop:',rotIndex);
 				spaceWorkOut(letterGroups, (geoms, letterIndex) => {
-					console.log('loop:', rotIndex, letterIndex)
 					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotIndex]);
 					mesh.updateMatrix();
 					mesh.matrixAutoUpdate = false;
@@ -563,7 +559,6 @@ function UserInterface(THREE, canvas) {
 					meshes.push(mesh);
 				}).then(()=>{
 					spaceWorkOut(meshes, (mesh)=>{
-						console.log('add mesh to scene:', mesh, Date.now() - startTime);
 						scene.add(mesh);
 					});
 				});
