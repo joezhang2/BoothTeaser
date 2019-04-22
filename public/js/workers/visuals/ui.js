@@ -8,6 +8,8 @@ function UserInterface(THREE, canvas) {
 	// Renderer specifics
 	let camera, scene, renderer, light;
 
+	let animating = false;
+
 	let boxRotationDims = {
 		x: 0,
 		y: 0
@@ -36,9 +38,31 @@ function UserInterface(THREE, canvas) {
 
 	const cameraHoverDistance = 75;
 
+	// handy function for converting degrees to radians
 	const rads = (degrees) => {
 		return THREE.Math.degToRad(degrees); //  * Math.PI / 180;
 	};
+
+	// Handy synchronous load splitting function
+	async function asyncForEach(array, callback) {
+		let index;
+		for (index = 0; index < array.length; index++) {
+			await callback(array[index], index, array);
+		}
+	}
+
+	const doNext = (thing, value, index, array) => new Promise(resolve => {
+		resolve(thing(value, index, array));
+	});
+
+	// * t i n y  m u s c l e s *
+	const spaceWorkOut = async (array, doer) => {
+		await asyncForEach(array, async (value, index, arr) => {
+			await doNext(doer, value, index, arr);
+			// console.log(value);
+		});
+		// console.log('Done');
+	}
 
 	const getVisibleBounds = (depth, camera) => {
 		const visibleHeightAtZDepth = (depth, camera) => {
@@ -68,7 +92,7 @@ function UserInterface(THREE, canvas) {
 	this.start3d = (appWidth, appHeight) => {
 		let startTime = Date.now();
 
-		return new Promise((resolve,reject) => {
+		return new Promise(resolve => {
 
 			const aspect = appWidth / appHeight;
 			scene = new THREE.Scene();
@@ -115,14 +139,14 @@ function UserInterface(THREE, canvas) {
 			pageCenterDims.width = window.innerWidth / 2;
 			pageCenterDims.height = appHeight / 2;
 
-			setTimeout(resolve, 0);
-		}).then(() => { 
+			resolve();
+		}).then(() => {
 			console.log('after start3d', Date.now() - startTime);
-			return drawSomething();
+			return createPoints();
 		}).then(setup => {
 			const config = setup.config,
 				points = setup.points;
-			console.log('after drawSomething', Date.now() - startTime);
+			console.log('after createPoints', Date.now() - startTime);
 			return loadFonts().then(font => {
 				console.log('after loadFonts', Date.now() - startTime);
 				const midway = config.maxWidth/2 + config.xPosition;
@@ -137,17 +161,17 @@ function UserInterface(THREE, canvas) {
 			return addLettersToScene(geometries);
 		}).then(()=>{
 			console.log('after addLettersToScene', Date.now() - startTime);
-			return new Promise((resolve,reject) => {
+			return new Promise(resolve => {
 
 				// Ad container is required by render function
 				// drawAdContainer(video);
 
 				render();
-				setTimeout(resolve, 0, {});
+				resolve();
 			});
 		}).then(()=>{
 			console.log('after first render', Date.now() - startTime);
-
+			animating = true;
 			requestAnimationFrame(animate);
 		});
 	};
@@ -200,7 +224,7 @@ function UserInterface(THREE, canvas) {
 	}
 
 	this.updatePerspective = (x,y,z) => {
-
+		if (!animating) { return; }
 		cameraTarget.x = x;
 		cameraTarget.y = y;
 		cameraTarget.z = z;
@@ -229,8 +253,6 @@ function UserInterface(THREE, canvas) {
 			onComplete: () => {console.log('finished tween', camera.rotation.y)}
 		}));
 	};
-
-	let busySemaphore = false;
 
 	// This is stuff that could happen at any interval driven by any animation loop (tweenmax for instance, or just a timeout, or raf)
 	const render = () => {
@@ -271,30 +293,11 @@ function UserInterface(THREE, canvas) {
 
 	// this is the use of raf (if it even works in a worker)
 	const animate = () => {
-		let st = Date.now();
-
-		if (busySemaphore) {
-			console.log('renderer busy, waiting...');
-			requestAnimationFrame(()=>{
-				console.log('raf', Date.now() - st);
-				animate();
-			});
-			return;
-		}
-		busySemaphore = true;
-		setTimeout(()=>{
-			render();
-			busySemaphore = false;
-		}, 0);
-
+		if (!animating) { return; }
+		render();
 		requestAnimationFrame(()=>{
-			console.log('raf', Date.now() - st);
 			animate();
 		});
-		// setTimeout(()=>{
-		// 	console.log('raf', performance.now() - st);
-		// 	animate();
-		// }, 16); // what should i replace this will? I think raf is supported, but is it?
 	};
 
 	const posRandRate = 0.9;
@@ -349,25 +352,22 @@ function UserInterface(THREE, canvas) {
 			currentArcIncrement;
 
 		const generateRing = (leftWidthBoundary, widthOffset, minRadius, maxRadius, widthVariance) => {
-			return new Promise((resolve, reject)=>{
-				setTimeout(()=>{
-					numMinArcSteps = Math.ceil((minRadius * twoPi) / (widthOffset));
-					minArcIncrement = (minRadius * twoPi) / numMinArcSteps;
-					
-					let promises = [];
+			return new Promise(resolve=>{
+				numMinArcSteps = Math.ceil((minRadius * twoPi) / (widthOffset));
+				minArcIncrement = (minRadius * twoPi) / numMinArcSteps;
+				
+				let promises = [];
 
-					for (currentArcIncrement = 0; currentArcIncrement < numMinArcSteps; currentArcIncrement++) {
-						currentMinArc = currentArcIncrement * minArcIncrement;
-						currentMaxArc = currentMinArc + minArcIncrement;
-						
-						promises.push(generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance));
-					}
-		
-					Promise.all(promises).then(()=>{ // verticies
-//						console.log('generateRing',vertices);
-						resolve(); // vertices
-					});
-				},0);
+				for (currentArcIncrement = 0; currentArcIncrement < numMinArcSteps; currentArcIncrement++) {
+					currentMinArc = currentArcIncrement * minArcIncrement;
+					currentMaxArc = currentMinArc + minArcIncrement;
+					
+					promises.push(generatePoint(leftWidthBoundary, widthOffset, currentMinArc, currentMaxArc, minRadius, maxRadius, widthVariance));
+				}
+	
+				Promise.all(promises).then(()=>{ // verticies
+					resolve(); // vertices
+				});
 			})
 		}
 		
@@ -375,59 +375,55 @@ function UserInterface(THREE, canvas) {
 			currentRadius;
 
 		const generateDisk = (leftWidthBoundary, widthOffset, maxRadius, minRadius, numRadiusIncrements, widthVariance) => {
-			return new Promise((resolve, reject) => {
-				setTimeout(()=>{
-					radiusIncrement = (maxRadius - minRadius)/ numRadiusIncrements;
-		
-					let promises = [];
-					//Generate points on inner diameter
-					promises.push(generateRing(leftWidthBoundary, widthOffset, minRadius, minRadius, widthVariance));
-					// Generate points inside ring
-					for(currentRadius = minRadius; currentRadius < maxRadius; currentRadius += radiusIncrement) {
-						promises.push(generateRing(leftWidthBoundary, widthOffset, currentRadius, currentRadius + radiusIncrement, widthVariance));
-					}
-					//Generate points on outer diameter
-					promises.push(generateRing(leftWidthBoundary, widthOffset, maxRadius, maxRadius, widthVariance));
-					
-					Promise.all(promises).then(() => { // pointArrays
-						// let vertices = [];
-						// pointArrays.forEach(ring=>{
-						// 	vertices = [...vertices, ...ring];
-						// });
-						// console.log('generateDisk',vertices);
-						resolve(); // vertices
-					});
-				},0);
+			return new Promise(resolve => {
+				radiusIncrement = (maxRadius - minRadius)/ numRadiusIncrements;
+	
+				let promises = [];
+				//Generate points on inner diameter
+				promises.push(generateRing(leftWidthBoundary, widthOffset, minRadius, minRadius, widthVariance));
+				// Generate points inside ring
+				for(currentRadius = minRadius; currentRadius < maxRadius; currentRadius += radiusIncrement) {
+					promises.push(generateRing(leftWidthBoundary, widthOffset, currentRadius, currentRadius + radiusIncrement, widthVariance));
+				}
+				//Generate points on outer diameter
+				promises.push(generateRing(leftWidthBoundary, widthOffset, maxRadius, maxRadius, widthVariance));
+				
+				Promise.all(promises).then(() => { // pointArrays
+					// let vertices = [];
+					// pointArrays.forEach(ring=>{
+					// 	vertices = [...vertices, ...ring];
+					// });
+					// console.log('generateDisk',vertices);
+					resolve(); // vertices
+				});
 			});
 		}
 
-		return new Promise((resolve,reject) => {
+		return new Promise(resolve => {
 			const widthIncrement = maxWidth / numWidthIncrement;
 			const endWith = xPosition + maxWidth;
 			
 			let startTime = Date.now();
-			setTimeout(()=>{
-				let firstSet = generateDisk(xPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false);
-	
-				let promises = [];
-				for(let currentXPosition = xPosition; currentXPosition < endWith; currentXPosition += widthIncrement) {
-					promises = [...promises, generateDisk(currentXPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, true)];
-				}
-				
-				let lastSet = generateDisk(endWith, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false);
-				console.log('after last promise chain', Date.now() - startTime);
+			let firstSet = generateDisk(xPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false);
 
-				Promise.all([firstSet, ...promises, lastSet]).then(() => { // pointArrays
-					console.log('generatePlantedForest', Date.now() - startTime);
+			let promises = [];
+			for(let currentXPosition = xPosition; currentXPosition < endWith; currentXPosition += widthIncrement) {
+				promises = [...promises, generateDisk(currentXPosition, widthIncrement, maxRadius, minRadius, numRadiusIncrements, true)];
+			}
+			
+			let lastSet = generateDisk(endWith, widthIncrement, maxRadius, minRadius, numRadiusIncrements, false);
+			console.log('after last promise chain', Date.now() - startTime);
 
-					// let vertices = [];
-					// pointArrays.forEach(disk=>{
-					// 	vertices = [...vertices, ...disk];
-					// });
-					// console.log('generateDisk',vertices);
-					resolve(points); // vertices
-				});
-			},0);
+			Promise.all([firstSet, ...promises, lastSet]).then(() => { // pointArrays
+				console.log('generatePlantedForest', Date.now() - startTime);
+
+				// let vertices = [];
+				// pointArrays.forEach(disk=>{
+				// 	vertices = [...vertices, ...disk];
+				// });
+				// console.log('generateDisk',vertices);
+				resolve(points); // vertices
+			});
 		});
 	};
 
@@ -441,9 +437,9 @@ function UserInterface(THREE, canvas) {
 	};
 
 
-	const drawSomething = () => {
+	const createPoints = () => {
 
-		const config = {
+		const Xonfig = {
 			maxWidth: 90,
 			xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
 			numWidthIncrement: 45,
@@ -452,16 +448,16 @@ function UserInterface(THREE, canvas) {
 			numRadiusIncrements: 20
 		};
 
-		const Xonfig = { // this is the dev config because it starts up faster, so your refreshes arent slow
+		const config = { // this is the dev config because it starts up faster, so your refreshes arent slow
 			maxWidth: 90,
 			xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
-			numWidthIncrement: 15,
+			numWidthIncrement: 25,
 			maxRadius: 45,
 			minRadius: 20,
-			numRadiusIncrements: 2
+			numRadiusIncrements: 10
 		};
 
-		return new Promise((resolve,reject) => {
+		return new Promise(resolve => {
 			generatePlantedForest(config.xPosition,
 				config.maxWidth, 
 				config.numWidthIncrement, 
@@ -475,119 +471,105 @@ function UserInterface(THREE, canvas) {
 	};
 
 	const loadFonts = () => {
-		const loader = new THREE.FontLoader();
-		return new Promise((resolve,reject) => {
-			loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', (font) => {
-				//drawLetters
-				resolve(font);
-			});
+		return new Promise(resolve => {
+			(new THREE.FontLoader()).load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', resolve);
 		});
 	};
 
 	const generateMaterials = (font) => {
 		const fontSize = .3,
-			possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+			possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; //+'abcdefghijklmnopqrstuvwxyz';
 
 		let letterShapeGeoms = [],
-			promises = [],
 			geometry,
-			shape,
-			i;
+			shape;
 
-		return new Promise((resolve,reject) => {
-
-			for (i = 0; possible.length > i; i++) {
-				promises.push(new Promise((resolve, reject)=>{
-					let x = i;
-					setTimeout(()=>{
-						shape = font.generateShapes(possible[x], fontSize);
-						geometry = new THREE.ShapeBufferGeometry(shape);
-						geometry.computeBoundingBox();
-						geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
-						letterShapeGeoms[x] = geometry;
-						resolve();
-					},0);
-				}));
-			}
-			
-			Promise.all(promises).then(()=>{
+		return new Promise(resolve => {
+			spaceWorkOut(possible.split(''), (value, index) => {
+				shape = font.generateShapes(value, fontSize);
+				geometry = new THREE.ShapeBufferGeometry(shape);
+				geometry.computeBoundingBox();
+				geometry.translate(-0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x), 0, 0);
+				letterShapeGeoms[index] = geometry;
+			}).then(()=>{
 				resolve(letterShapeGeoms);
 			});
 		});
 	};
 
 	const generateGeometries = (letterShapeGeoms, points, midway) => {
-		return new Promise((resolve,reject) => {
-			let geometries = {},
-				rotY,
-				letterPos,
-				newGeom;
-			
-			const halfPi = Math.PI/2;
+		let geometries = [],
+			rotY,
+			letterPos,
+			newGeom;
+	
+		const halfPi = Math.PI/2;
 
-			let promises = [];
+		return new Promise(resolve => {
+			spaceWorkOut(points, (pos)=>{
+				if (pos.x < midway - 20){
+					rotY = 2;
+				} else if (pos.x > midway + 20) {
+					rotY = 0;
+				} else {
+					rotY = 1;
+				}
 
-			points.forEach(pos => {
-				promises.push(new Promise((resolve, reject)=>{
-					setTimeout(()=>{
-						if (pos.x < midway - 20){
-							rotY = 1;
-						} else if (pos.x > midway + 20) {
-							rotY = -1;
-						} else {
-							rotY = 0;
-						}
-		
-						letterPos = Math.floor(Math.random() * letterShapeGeoms.length);
-		
-						if (!geometries[rotY]) { geometries[rotY] = {}; }
-						if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
-		
-						newGeom = letterShapeGeoms[letterPos].clone();
-		
-						newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * halfPi);
-				//		newGeom.rotateY(rotY);
-						// plane.rotation.y = plane.rotation.y + rotY;
-						newGeom.translate( pos.x, pos.y, pos.z );
-		
-						geometries[rotY][letterPos].push(newGeom);
-						resolve();
-					},0);
-				}));
-			});
+				letterPos = Math.floor(Math.random() * letterShapeGeoms.length);
 
-			
-			Promise.all(promises).then(()=>{
-				setTimeout(()=> {
-					resolve(geometries);
-				},5000); // give chrome a minute to just catch its breath
+				if (!geometries[rotY]) { geometries[rotY] = []; }
+				if (!geometries[rotY][letterPos]) { geometries[rotY][letterPos] = []; }
+				console.log(rotY, letterPos);
+
+				newGeom = letterShapeGeoms[letterPos].clone();
+
+				newGeom.rotateX(Math.atan2(pos.z, pos.y) + 3 * halfPi);
+		//		newGeom.rotateY(rotY);
+				// plane.rotation.y = plane.rotation.y + rotY;
+				newGeom.translate( pos.x, pos.y, pos.z );
+
+				geometries[rotY][letterPos].push(newGeom);
+			}).then(()=>{
+				resolve(geometries);
 			});
 		});
 	};
 
 	const addLettersToScene = (geometries) => {
-		const colors = {
-			'-1': createMaterial(0xFF7722),
-			'0': createMaterial(0x222222),
-			'1': createMaterial(0x2277FF)
-		};
+		const colors = [
+			createMaterial(0xFF7722),
+			createMaterial(0x222222),
+			createMaterial(0x2277FF)
+		];
 
-		console.log('start add letters to scene');
-		return new Promise((resolve,reject) => {
-			for(let rotY in geometries) {
-				let letterGroups = geometries[rotY];
-				for(let index in letterGroups) {
-					let geoms = letterGroups[index],
-						mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotY]);
+		let mesh,
+			meshes = [];
+
+		const startTime = Date.now();
+
+		console.log('start add letters to scene', Date.now() - startTime);
+		return new Promise(resolve => {
+			console.log('kickoff', geometries);
+			spaceWorkOut(geometries, (letterGroups, rotIndex)=>{
+				console.log('loop:',rotIndex);
+				spaceWorkOut(letterGroups, (geoms, letterIndex) => {
+					console.log('loop:', rotIndex, letterIndex)
+					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotIndex]);
 					mesh.updateMatrix();
 					mesh.matrixAutoUpdate = false;
 					// mesh.rotation.x = mesh.rotation.x;
 					// mesh.rotation.y = mesh.rotation.y;
-					scene.add(mesh);
-				}
-			}
-			
-			setTimeout(resolve, 0);
+					meshes.push(mesh);
+				}).then(()=>{
+					spaceWorkOut(meshes, (mesh)=>{
+						console.log('add mesh to scene:', mesh, Date.now() - startTime);
+						scene.add(mesh);
+					});
+				});
+			}).then(()=>{
+				console.log('done adding letter meshes to scene:', Date.now() - startTime);
+				resolve();
+			});
 		});
 	}
 
