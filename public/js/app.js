@@ -30,7 +30,15 @@ let runtimeInfo = {
 	}
 };
 
-const initializeApp = () => {
+let detectionAvailable = false;
+
+// can't tell if these are hanging around or not. Chrome's debug tab is filled with instances
+window.onbeforeunload = ()=>{
+	if(visualsWorker) { visualsWorker.terminate(); }
+	if(controlsWorker) { controlsWorker.terminate(); }
+}
+
+function initializeApp () {
 	return new Promise(resolve => {
 		// it's this value forever now
 		appDims.width = window.innerWidth;
@@ -44,20 +52,80 @@ const initializeApp = () => {
 		const uiCanvas = domCanvas.transferControlToOffscreen(); // creates an offscreen canvas element that can be transfered to a web worker and keeps it linked to the original canvas
 		body.appendChild(domCanvas);
 
-		let fakeWindow = {
-			devicePixelRatio: window.devicePixelRatio,
-			screen: { 
-				width: window.screen.width,
-				height: window.screen.height
-			},
-			innerWidth: appDims.width,
-			innerHeight: appDims.height,
-			navigator: {
-				userAgent: navigator.userAgent,
-				vendor: navigator.vendor
+		var screenCopy = {};
+		for(let key in screen){
+			screenCopy[key] = +screen[key];
+		}
+		screenCopy.orientation = {};
+		for(let key in screen.orientation){
+			if (typeof screen.orientation[key] !== 'function') {
+				screenCopy.orientation[key] = screen.orientation[key];
 			}
-		};
-		
+		}
+
+		var visualViewportCopy = {};
+		if (typeof window['visualViewport'] !== 'undefined') {
+			for(let key in visualViewport){
+				if(typeof visualViewport[key] !== 'function') {
+					visualViewportCopy[key] = +visualViewport[key];
+				}
+			}
+		}
+	
+		var styleMediaCopy = {};
+		if (typeof window['styleMedia'] !== 'undefined') {
+			for(let key in styleMedia){
+				if(typeof styleMedia[key] !== 'function') {
+					styleMediaCopy[key] = styleMedia[key];
+				}
+			}
+		}
+
+		let fakeWindow = {};
+		Object.getOwnPropertyNames(window).forEach(name => {
+			try {
+				if (typeof window[name] !== 'function'){
+					if (typeof window[name] !== 'object' && 
+						name !== 'undefined' && 
+						name !== 'NaN' && 
+						name !== 'Infinity' && 
+						name !== 'event' && 
+						name !== 'name' 
+					) {
+						fakeWindow[name] = window[name];
+					} else if (name === 'visualViewport') {
+						console.log('want this?', name, JSON.parse(JSON.stringify(window[name])));
+					} else if (name === 'styleMedia') {
+						console.log('want this?', name, JSON.parse(JSON.stringify(window[name])));
+					}
+				}
+			} catch (ex){
+				console.log('Access denied for a window property');
+			}
+		});
+
+		fakeWindow.screen = screenCopy;
+		fakeWindow.visualViewport = visualViewportCopy;
+		fakeWindow.styleMedia = styleMediaCopy;
+		console.log(fakeWindow);
+
+		let fakeDocument = {};
+		for(let name in document){
+			try {
+				if(name === 'all') {
+					// o_O
+				} else if (typeof document[name] !== 'function' && typeof document[name] !== 'object') {
+						fakeDocument[name] = document[name];
+				} else if (typeof document[name] === 'object') {
+					fakeDocument[name] = null;
+				} else if(typeof document[name] === 'function') {
+					fakeDocument[name] = { type:'*function*', name: document[name].name };
+				}
+			} catch (ex){
+				console.log('Access denied for a window property');
+			}
+		}
+
 		runtimeInfo.video.width = video.videoWidth;
 		runtimeInfo.video.height = video.videoHeight;
 		runtimeInfo.ui.width = appDims.width;
@@ -85,14 +153,21 @@ const initializeApp = () => {
 		startupPromises.push(new Promise(r=>{
 			controlsWorker.onmessage = (event) => {
 				if (event.data.yo) {
-					console.log('visual worker says:', event.data.yo, event.data);
+					console.log('controls worker says:', event.data.yo, event.data);
 				} else {
 					switch (event.data.route) {
 						case 'initialized':
 							console.log('initialized controls');
+							detectionAvailable = true;
 							r();
 							break;
+						case 'noFacesFound':
+							console.log('returned no faces due to error');
+							detectionAvailable = true;
+							break;
 						case 'updateFacePosition':
+							console.log('returned face results. ready for new video frame');
+							detectionAvailable = true;
 							visualsWorker.postMessage({
 								route: 'perspectiveUpdate',
 								x: boxRotationDims.x, // left right position from center
@@ -107,8 +182,8 @@ const initializeApp = () => {
 			};
 		}));
 
-		visualsWorker.postMessage({route:'init', fakeWindow, uiCanvas}, [uiCanvas]); // window is copied, ui is "transfered" via 0 copy
-		controlsWorker.postMessage({route:'init', fakeWindow, runtimeInfo});
+		visualsWorker.postMessage({route:'init', fakeWindow, fakeDocument, uiCanvas}, [uiCanvas]); // window is copied, ui is "transfered" via 0 copy
+		controlsWorker.postMessage({route:'init', fakeWindow, fakeDocument, runtimeInfo});
 		// make sure we don't do this more than once
 		startButton.removeEventListener('click', initializeApp);
 		body.removeChild(startButton);
@@ -150,7 +225,7 @@ const raf = ()=>{
 
 	// update this with a boolean representing processing state on worker
 	// This should be throttled so it runs when the detections arent already running on a still
-	if(1){
+	if(detectionAvailable){
 		const controlsData = vidCanvasCtx.getImageData(
 			0,
 			0,
@@ -159,6 +234,8 @@ const raf = ()=>{
 		);
 		const buffer = controlsData.data.buffer;
 		console.log('sending buffer', buffer);
+
+		detectionAvailable = false;
 		controlsWorker.postMessage({
 			route: 'videoFrameUpdate', 
 			buffer: buffer
@@ -167,8 +244,22 @@ const raf = ()=>{
 	}
 
 	stats.end();
-	// requestAnimationFrame(raf);
+	requestAnimationFrame(raf);
 }
+
+let perspectiveUpdatePending = null;
+const updatePerspective = (e)=>{
+	boxRotationDims.x = ((appDims.width/2) - e.pageX) * 0.01;
+	boxRotationDims.y = ((appDims.height/2) - e.pageY) * 0.01;
+
+	// this will be replaced by face detection updates
+	visualsWorker.postMessage({
+		route: 'perspectiveUpdate',
+		x: boxRotationDims.x, // left right position from center
+		y: boxRotationDims.y, // up down position from center
+		z: 10 // distance from center
+	});
+};
 
 videoApp.startVideo().then((videoMetaData)=>{
 	console.log('video loadedmetadata received', videoMetaData);
@@ -178,17 +269,13 @@ videoApp.startVideo().then((videoMetaData)=>{
 	startButton.style.height = window.innerHeight+'px';
 	startButton.addEventListener('click', ()=>{
 		initializeApp().then(()=>{
-			body.addEventListener('mousedown', (e) => {
-				boxRotationDims.x = ((appDims.width/2) - e.pageX) * 0.01;
-				boxRotationDims.y = ((appDims.height/2) - e.pageY) * 0.01;
-	
-				// this will be replaced by face detection updates
-				visualsWorker.postMessage({
-					route: 'perspectiveUpdate',
-					x: boxRotationDims.x, // left right position from center
-					y: boxRotationDims.y, // up down position from center
-					z: 10 // distance from center
-				});
+			console.log('startup has completed');
+			body.addEventListener('mousemove', (evt) => {
+				if (perspectiveUpdatePending) { return; }
+				perspectiveUpdatePending = setTimeout(()=>{
+					perspectiveUpdatePending = null;
+				}, 200); // delay 200ms between mousemove updates. updates happening too often can cause jank
+				updatePerspective(evt);
 			});
 			requestAnimationFrame(raf);
 		});

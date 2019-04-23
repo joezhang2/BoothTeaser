@@ -3,19 +3,28 @@
 function FaceTracking(sourceWidth, sourceHeight) {
 
 	let busy = false;
-	
+	let ready = false;
+
 	const videoDims = {
 		width: sourceWidth,
 		height: sourceHeight
 	};
 
+	const startTime = Date.now();
+
 	this.startFaceTracking = async ()=>{
-		await faceapi.loadTinyFaceDetectorModel(MODELS_PATH);
-		console.log('after loadTinyFaceDetectorModel', Date.now() - startTime);
-		await faceapi.loadFaceRecognitionModel(MODELS_PATH);
-		console.log('after loadFaceRecognitionModel', Date.now() - startTime);
-		await faceapi.loadFaceLandmarkTinyModel(MODELS_PATH);
-		console.log('after loadFaceLandmarkTinyModel', Date.now() - startTime);	
+		return new Promise(async (resolve)=>{
+			const MODELS_PATH = '/js/models';
+
+			await faceapi.loadTinyFaceDetectorModel(MODELS_PATH);
+			console.log('after loadTinyFaceDetectorModel', Date.now() - startTime);
+			await faceapi.loadFaceRecognitionModel(MODELS_PATH);
+			console.log('after loadFaceRecognitionModel', Date.now() - startTime);
+			await faceapi.loadFaceLandmarkTinyModel(MODELS_PATH);
+			console.log('after loadFaceLandmarkTinyModel', Date.now() - startTime);	
+			ready = true;
+			resolve();
+		});
 	};
 
 	let profileCache = [];
@@ -168,8 +177,8 @@ function FaceTracking(sourceWidth, sourceHeight) {
 		};
 	};
 	
-	let idleCameraTimeout;
 	const updateCameraWithNewFacePosition = () => {
+
 		console.log('-!-!-!-!- update camera position');
 		console.log('current camera pos', camera.position.x, updateCamera);
 		// clear update delegates if any are pending
@@ -226,6 +235,12 @@ function FaceTracking(sourceWidth, sourceHeight) {
 		}
 		// videoCropTweens.add(TweenMax.to(vidMap.rotation, 0.5, {x: 1, ease: Power2.easeInOut}));
 		// videoCropTweens.add(TweenMax.to(vidMap.position, 0.5, {x: 1, ease: Power2.easeInOut}));
+
+
+
+		postMessage({
+			
+		});
 	};
 	
 	
@@ -314,7 +329,8 @@ function FaceTracking(sourceWidth, sourceHeight) {
 	let appIdleTimeout;
 	this.detect = videoCanvas => {
 		return new Promise(resolve=>{
-			if (busy) {
+			if (busy || !ready) {
+				console.log('Requested detection, but models have not loaded yet.');
 				resolve();
 			}
 			busy = true;
@@ -386,15 +402,15 @@ function FaceTracking(sourceWidth, sourceHeight) {
 				}
 				// setTimeout was here
 				// setTimeout(detect, 200, video);
-				videoBitmap.close(); // dispose of ImageBitmap so it can be cleaned up immediately
 				busy = false;
 				resolve(profileCache);
 			}).catch(err => {
-				videoBitmap.close(); // dispose of ImageBitmap so it can be cleaned up immediately
 				busy = false;
+				console.log(err);
 				console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 				console.error('badness in the face detction. could not detect. exiting app.');
 				console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+				reject(err);
 			});
 		});
 
