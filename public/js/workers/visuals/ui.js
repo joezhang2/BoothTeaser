@@ -35,14 +35,42 @@ function UserInterface(THREE, canvas) {
 
 	const adContainerDims = {
 		width: 8,
-		height:4
+		height: 4
 	}
 
+	const faker = window.faker;
+	const stepY = 0.5;
 	// current state of rotation animation
 	let angle = 0;
 
 	const cameraHoverDistance = 75;
 
+	const createPerson = (active, profile, boundary, priority, timestamp, landmarks) => {
+		return {
+			uuid: THREE.Math.generateUUID(),
+			active,
+			profile,
+			boundary,
+			priority,
+			timestamp,
+			landmarks,
+			idleTimeout: null
+		};
+	};
+
+	const createProfileCacheEntry = () => {
+		// profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
+		let person = createPerson(true, faker.helpers.createCard(), Date.now())
+		// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
+		// if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
+		console.log(person)
+		return person;
+		// return profileCache[profileCache.length-1].uuid;
+	};
+
+
+
+	let person = createProfileCacheEntry();
 	// handy function for converting degrees to radians
 	const rads = (degrees) => {
 		return THREE.Math.degToRad(degrees); //  * Math.PI / 180;
@@ -214,30 +242,78 @@ function UserInterface(THREE, canvas) {
 
 		adContainer.add(shadowMesh);
 		adContainer.add(bgMesh);
-		let mesh = await drawLetters();
-		adContainer.add(mesh)
+		await drawLetters(bgMesh);
 		scene.add(adContainer);
 	};
 
-	const drawLetters = async () => {
+	const step = 0.25;
+	const drawLetters = async (parentMesh) => {
 
 		return loadFonts().then(font => {
-			var textGeo = new THREE.TextBufferGeometry("This is some text", {
-				font: font,
-				size: 0.1,
-				height: 1,
-				curveSegments: 12,
-				bevelEnabled: false,
+			parentMesh.geometry.computeBoundingBox();
+
+			let profilePosX = parentMesh.geometry.boundingBox.min.x + 0.25;
+			let profilePosY = parentMesh.geometry.boundingBox.max.y - 0.5;
+			drawConversantProfile(font, 'Conversant', profilePosX, profilePosY, 0);
+			drawConversantProfile(font, 'Conversant', profilePosX, profilePosY, 0);
+			drawConversantProfile(font, 'Opt Outed', profilePosX,  parentMesh.geometry.boundingBox.min.y + 0.5, 0);
+
+
+			let brandPosX = 0.25;
+			let brandPosY = parentMesh.geometry.boundingBox.max.y - 0.5;
+			drawBrandCoProfile(font, 'Brand Co.', brandPosX, brandPosY, 0);
+			brandPosY -= step
+			// GDPR section
+			drawBrandCoProfile(font, 'GDPR', brandPosX, brandPosY, 0);
+			brandPosY -= step
+			let addr = person.profile.address;
+			drawBrandCoProfile(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.05, brandPosY, 0);
+			brandPosY -= step
+			// PII section
+			drawBrandCoProfile(font, 'PII', brandPosX, brandPosY, 0)
+			brandPosY -= step
+			// Account history section
+			drawBrandCoProfile(font, 'Account History', brandPosX, brandPosY, 0)
+			brandPosY -= step
+			person.profile.accountHistory.forEach((item) => {
+				drawBrandCoProfile(font, `${item.name} : $${item.amount} : ${item.business}`, brandPosX + 0.05, brandPosY, 0);
+				brandPosY -= step
 			});
-			textGeo.computeBoundingBox();
-			var centerOffset = - 0.5 * (textGeo.boundingBox.max.x - textGeo.boundingBox.min.x);
-			var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
-			var mesh = new THREE.Mesh(textGeo, textMaterial);
-			mesh.position.x = centerOffset;
-			return mesh;
+			return '';
 		})
 	}
 
+	const drawConversantProfile = (font, text, x, y, z) => {
+		var textGeo = new THREE.TextBufferGeometry(text, {
+			font: font,
+			size: 0.06,
+			height: 0,
+			curveSegments: 12,
+			bevelEnabled: false,
+		});
+		var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
+		var mesh = new THREE.Mesh(textGeo, textMaterial);
+		mesh.position.x = x;
+		mesh.position.y = y;
+		mesh.position.z = z
+		adContainer.add(mesh);
+	}
+
+	const drawBrandCoProfile = (font, text, x, y, z) => {
+		var textGeo = new THREE.TextBufferGeometry(text, {
+			font: font,
+			size: 0.06,
+			height: 0.1,
+			curveSegments: 12,
+			bevelEnabled: false,
+		});
+		var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
+		var mesh = new THREE.Mesh(textGeo, textMaterial);
+		mesh.position.x = x;
+		mesh.position.y = y;
+		mesh.position.z = z
+		adContainer.add(mesh);
+	}
 
 	let cameraTweens = [];
 	let cameraTarget = { x: 0, y: 0, z: 0 };

@@ -39,7 +39,8 @@ onmessage = (event) => {
 			'/js/libs/BufferGeometryUtils.js',
 		//	'/js/libs/GeometryUtils.js',
 			'/js/libs/TweenMax.js',
-			'/js/workers/visuals/ui.js'
+			'/js/workers/visuals/ui.js', 
+			'/js/libs/faker.js'
 		);
 
 		ui = new UserInterface(THREE, event.data.uiCanvas);
