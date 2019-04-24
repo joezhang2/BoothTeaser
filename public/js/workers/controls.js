@@ -112,17 +112,23 @@ onmessage = (event) => {
 			break;
 		case 'videoFrameUpdate':
 			if(!faceTracking) { return; }
-			console.log('processing video', event);
+			// console.log('processing video', event);
 
-			const imageData = new ImageData( 
-				new Uint8ClampedArray( event.data.buffer ),
-				runtimeInfo.video.width,
-				runtimeInfo.video.height
-			);
+			// const imageData = new ImageData( 
+			// 	new Uint8ClampedArray( event.data.buffer ),
+			// 	runtimeInfo.video.width,
+			// 	runtimeInfo.video.height
+			// );
 
 			// ctx.putImageData(imageData, dx, dy, dirtyX, dirtyY, dirtyWidth, dirtyHeight)
-			workingContext.putImageData(imageData, 0, 0, 0, 0, runtimeInfo.video.width, runtimeInfo.video.height);
+			// workingContext.putImageData(imageData, 0, 0, 0, 0, runtimeInfo.video.width, runtimeInfo.video.height);
 
+			// void ctx.drawImage(image, dx, dy);
+			// void ctx.drawImage(image, dx, dy, dWidth, dHeight);
+			// void ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+			workingContext.drawImage(event.data.bitmap, 0, 0, runtimeInfo.video.width, runtimeInfo.video.height);
+			event.data.bitmap.close();
+			
 			// console.log('detecting a face with this:', imageData, workingContext, workingCanvas);
 			faceTracking.detect(workingCanvas).then((allProfiles)=>{
 				// console.log('all profiles:', allProfiles);

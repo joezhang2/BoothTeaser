@@ -205,55 +205,44 @@ function initializeApp () {
 	});
 };
 
-const stats = new window.Stats(); // included by index.html
-stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-body.appendChild( stats.dom );
+// const stats = new window.Stats(); // included by index.html
+// stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+// body.appendChild( stats.dom );
 
-const vidCanvas = document.createElement('canvas');
-let vidCanvasCtx;
+let vidCanvas,
+	vidCanvasCtx,
+	d0,d1,d2,d3,d4,d5,
+	controlsData,
+	uiData,
+	controlsBitmap;
 
 const raf = ()=>{
-	stats.begin();
-
-	vidCanvasCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-	
-	if (0) { // send visuals to the 3d universe?
-		// Instead of returning an ImageData object, this returns this as a Uint8ClampedArray instead. Thanks?
-		const uiData = vidCanvasCtx.getImageData(
-			0,
-			0,
-			video.videoWidth,
-			video.videoHeight
-		);
-
-		// This should send as often as a frame needs to be rendered to the screen
-		visualsWorker.postMessage({
-			route:'videoFrameUpdate',
-			uiData: uiData.data.buffer
-		}, [uiData.data.buffer]); // "transfered" via 0 copy, which is really 0 serialize deserialize
-	}
+	// stats.begin();
+	d1=null;
+	d2=null;
+	d3=null;
+	const startTime = Date.now();
 
 	// update this with a boolean representing processing state on worker
 	// This should be throttled so it runs when the detections arent already running on a still
 	if(detectionAvailable){
-		const controlsData = vidCanvasCtx.getImageData(
-			0,
-			0,
-			video.videoWidth,
-			video.videoHeight
-		);
-		const buffer = controlsData.data.buffer;
-		console.log('sending buffer', buffer);
-
 		detectionAvailable = false;
-		controlsWorker.postMessage({
-			route: 'videoFrameUpdate', 
-			buffer: buffer
-		}, [buffer]); // "transfered"
-		console.log('sent buffer', buffer);
+
+		// createImageBitmap(image[, options]).then(function(response) { ... });
+		// createImageBitmap(image, sx, sy, sw, sh[, options]).then(function(response) { ... });
+		d1 = Date.now() - startTime;
+		createImageBitmap(video, 0, 0, video.videoWidth, video.videoHeight).then(bitmap=>{
+			d2 = Date.now() - startTime;
+			controlsWorker.postMessage({
+				route: 'videoFrameUpdate',
+				bitmap: bitmap
+			}, [bitmap]); // "transfered"
+			d3 = Date.now() - startTime;
+			console.log('raf:', d1, d2, d3);
+		});
 	}
 
-	stats.end();
+	// stats.end();
 	requestAnimationFrame(raf);
 }
 
@@ -292,8 +281,9 @@ videoApp.startVideo().then((videoMetaData)=>{
 	});
 	body.appendChild(startButton);
 
-	vidCanvas.width = video.videoWidth;
-	vidCanvas.height = video.videoHeight;
+	vidCanvas = new OffscreenCanvas(video.videoWidth, video.videoHeight);
+	// vidCanvas.width = video.videoWidth;
+	// vidCanvas.height = video.videoHeight;
 	vidCanvasCtx = vidCanvas.getContext('2d');
 });
 
