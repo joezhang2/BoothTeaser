@@ -58,19 +58,19 @@ function UserInterface(THREE, canvas) {
 		};
 	};
 
-	const createProfileCacheEntry = () => {
-		// profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
-		let person = createPerson(true, faker.helpers.createCard(), Date.now())
-		// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-		// if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
-		console.log(person)
-		return person;
-		// return profileCache[profileCache.length-1].uuid;
-	};
+	// const createProfileCacheEntry = () => {
+	// 	// profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
+	// 	let person = createPerson(true, faker.helpers.createCard(), Date.now())
+	// 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
+	// 	// if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
+	// 	console.log(person)
+	// 	return person;
+	// 	// return profileCache[profileCache.length-1].uuid;
+	// };
 
 
 
-	let person = createProfileCacheEntry();
+	// let person = createProfileCacheEntry();
 	// handy function for converting degrees to radians
 	const rads = (degrees) => {
 		return THREE.Math.degToRad(degrees); //  * Math.PI / 180;
@@ -197,7 +197,9 @@ function UserInterface(THREE, canvas) {
 
 				// Ad container is required by render function
 				drawAdContainer();
-
+				text().then((adContainer) =>{
+					scene.add(adContainer);
+				})
 				render();
 				resolve();
 			});
@@ -208,12 +210,12 @@ function UserInterface(THREE, canvas) {
 		});
 	};
 
-	var textBlock;
 	var adContainer = new THREE.Group();
+	let bgMesh;
 	// this is where all the profile layout stuff needs to happen
 	const drawAdContainer = async () => {
 
-		const bgMesh = new THREE.Mesh(
+		bgMesh = new THREE.Mesh(
 			new THREE.PlaneBufferGeometry(adContainerDims.width, adContainerDims.height, 1, 1),
 			new THREE.MeshPhysicalMaterial({ // this should probably be basic
 				color: new THREE.Color(0x2277FF),
@@ -241,58 +243,69 @@ function UserInterface(THREE, canvas) {
 
 		adContainer.add(shadowMesh);
 		adContainer.add(bgMesh);
-		await text(bgMesh);
-		scene.add(adContainer);
+		// await text();
+		// scene.add(adContainer);
 	};
 
 	const step = 0.25;
 	let isOptedOut = 'No';
-	const text = async (parentMesh) => {
 	
-		return loadFonts().then(font => {
-			parentMesh.geometry.computeBoundingBox();
+	const text = async (person) => {
 
-			let profilePosX = parentMesh.geometry.boundingBox.min.x + 0.25;
-			let profilePosY = parentMesh.geometry.boundingBox.max.y - 0.5;
+		return loadFonts().then(font => {
+			bgMesh.geometry.computeBoundingBox();
+
+			// position profile
+			let profilePosX = bgMesh.geometry.boundingBox.min.x + 0.25;
+			let profilePosY = bgMesh.geometry.boundingBox.max.y - 0.5;
+
+			//position brand
+			let brandPosX = .25;
+			let brandPosY = bgMesh.geometry.boundingBox.max.y - 0.5;
+
+			// Headers
 			drawLetters(font, 'Conversant', profilePosX, profilePosY, 0.09);
 			drawLetters(font, '_VS_', -0.25, profilePosY, 0.09);
-
-			profilePosY -= step;
-			// Profile section
-			drawLetters(font, 'Profile', profilePosX, profilePosY, 0.07);
-			profilePosY -= step
-			// Conversant attributes placeholder
-			person.profile.accountHistory.forEach((item) => {
-				drawLetters(font, `${item.name}`, profilePosX  + 0.25, profilePosY, 0.05);
-				profilePosY -= step;
-			});
- 			drawLetters(font, 'Opted Out ' + isOptedOut, profilePosX,  parentMesh.geometry.boundingBox.min.y + 0.25, 0.09);
-
-			// Brand section
-			let brandPosX = .25;
-			let brandPosY = parentMesh.geometry.boundingBox.max.y - 0.5;
 			drawLetters(font, 'Brand Co.', 3.2, brandPosY, 0.09);
-			brandPosY -= step
-			// PII section
-			drawLetters(font, 'PII', brandPosX, brandPosY, 0.07);
-			brandPosY -= step
-			drawLetters(font, `Name: ${person.profile.name}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			drawLetters(font, `Email: ${person.profile.email}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			drawLetters(font, `Phone: ${person.profile.phone}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			let addr = person.profile.address;
-			drawLetters(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			// Account history section
-			drawLetters(font, 'Account History', brandPosX, brandPosY, 0.07)
-			brandPosY -= step
-			person.profile.accountHistory.forEach((item) => {
-				drawLetters(font, `${item.name} : $${item.amount} : ${item.business}`, brandPosX + 0.25, brandPosY, 0.05);
+			console.log(person)
+			// Only show info if person is available
+			if (person) {
+				profilePosY -= step;
+				// Profile section
+				drawLetters(font, 'Profile', profilePosX, profilePosY, 0.07);
+				profilePosY -= step
+				// Conversant attributes placeholder
+				console.log(person.profile.accountHistory)
+				person.profile.accountHistory.forEach((item) => {
+					drawLetters(font, `${item}`, profilePosX + 0.25, profilePosY, 0.05);
+					profilePosY -= step;
+				});
+				drawLetters(font, 'Opted Out ' + isOptedOut, profilePosX, bgMesh.geometry.boundingBox.min.y + 0.25, 0.09);
+
+				// Brand section
+
 				brandPosY -= step
-			});
-			return '';
+				// PII section
+				drawLetters(font, 'PII', brandPosX, brandPosY, 0.07);
+				brandPosY -= step
+				drawLetters(font, `Name: ${person.profile.name}`, brandPosX + 0.25, brandPosY, 0.05);
+				brandPosY -= step
+				drawLetters(font, `Email: ${person.profile.email}`, brandPosX + 0.25, brandPosY, 0.05);
+				brandPosY -= step
+				drawLetters(font, `Phone: ${person.profile.phone}`, brandPosX + 0.25, brandPosY, 0.05);
+				brandPosY -= step
+				let addr = person.profile.address;
+				drawLetters(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.25, brandPosY, 0.05);
+				brandPosY -= step
+				// Account history section
+				drawLetters(font, 'Account History', brandPosX, brandPosY, 0.07)
+				brandPosY -= step
+				person.profile.accountHistory.forEach((item) => {
+					drawLetters(font, `${item}`, brandPosX + 0.25, brandPosY, 0.05);
+					brandPosY -= step
+				});
+			}
+			return adContainer;
 		})
 	}
 
@@ -319,9 +332,16 @@ function UserInterface(THREE, canvas) {
 		y: Math.PI / 1000,
 		z: Math.PI / 1000
 	};
-
+	let prevPerson = null;
 	this.trackProfile = (vip) => {
 		console.log('vip received', vip);
+		// Only update if new person
+		if (prevPerson === null || vip.uuid !== prevPerson.uuid) {
+			prevPerson = vip;
+			console.log('Different PERSON');
+			text(vip);
+		}
+		console.log(vip.uuid === prevPerson.uuid)
 	};
 
 	this.updatePerspective = (x, y, z) => {
@@ -655,16 +675,16 @@ function UserInterface(THREE, canvas) {
 
 		console.log('start add letters to scene', Date.now() - startTime);
 		return new Promise(resolve => {
-			spaceWorkOut(geometries, (letterGroups, rotIndex)=>{
+			spaceWorkOut(geometries, (letterGroups, rotIndex) => {
 				spaceWorkOut(letterGroups, (geoms, letterIndex) => {
-					mesh = new THREE.Mesh( THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotIndex]);
+					mesh = new THREE.Mesh(THREE.BufferGeometryUtils.mergeBufferGeometries(geoms, true), colors[rotIndex]);
 					mesh.updateMatrix();
 					mesh.matrixAutoUpdate = false;
 					// mesh.rotation.x = mesh.rotation.x;
 					// mesh.rotation.y = mesh.rotation.y;
 					meshes.push(mesh);
-				}).then(()=>{
-					spaceWorkOut(meshes, (mesh)=>{
+				}).then(() => {
+					spaceWorkOut(meshes, (mesh) => {
 						scene.add(mesh);
 					});
 				});
