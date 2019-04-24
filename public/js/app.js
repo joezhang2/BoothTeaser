@@ -177,7 +177,7 @@ function initializeApp () {
 								x: boxRotationDims.x, // left right position from center
 								y: boxRotationDims.y, // up down position from center
 								z: 10 // distance from center
-							});
+							}); 
 							break;
 						case 'readyForNewImage':
 							// do a second between detections and see if the jank goes away

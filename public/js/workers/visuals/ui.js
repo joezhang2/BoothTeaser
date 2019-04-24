@@ -242,51 +242,67 @@ function UserInterface(THREE, canvas) {
 
 		adContainer.add(shadowMesh);
 		adContainer.add(bgMesh);
-		await drawLetters(bgMesh);
+		await text(bgMesh);
 		scene.add(adContainer);
 	};
 
 	const step = 0.25;
-	const drawLetters = async (parentMesh) => {
-
+	let isOptedOut = 'No';
+	const text = async (parentMesh) => {
+	
 		return loadFonts().then(font => {
 			parentMesh.geometry.computeBoundingBox();
 
 			let profilePosX = parentMesh.geometry.boundingBox.min.x + 0.25;
 			let profilePosY = parentMesh.geometry.boundingBox.max.y - 0.5;
-			drawConversantProfile(font, 'Conversant', profilePosX, profilePosY, 0);
-			drawConversantProfile(font, 'Conversant', profilePosX, profilePosY, 0);
-			drawConversantProfile(font, 'Opt Outed', profilePosX,  parentMesh.geometry.boundingBox.min.y + 0.5, 0);
+			drawLetters(font, 'Conversant', profilePosX, profilePosY, 0.09);
+			drawLetters(font, '_VS_', -0.25, profilePosY, 0.09);
+
+			profilePosY -= step;
+			// GDPR section
+			drawLetters(font, 'Profile', profilePosX, profilePosY, 0.07);
+			profilePosY -= step
+			// Conversant attributes
+			person.profile.accountHistory.forEach((item) => {
+				drawLetters(font, `${item.name}`, profilePosX  + 0.25, profilePosY, 0.05);
+				profilePosY -= step;
+			});
 
 
-			let brandPosX = 0.25;
+ 			drawLetters(font, 'Opted Out ' + isOptedOut, profilePosX,  parentMesh.geometry.boundingBox.min.y + 0.25, 0.09);
+
+
+			let brandPosX = .25;
 			let brandPosY = parentMesh.geometry.boundingBox.max.y - 0.5;
-			drawBrandCoProfile(font, 'Brand Co.', brandPosX, brandPosY, 0);
+			drawLetters(font, 'Brand Co.', 3.2, brandPosY, 0.09);
 			brandPosY -= step
 			// GDPR section
-			drawBrandCoProfile(font, 'GDPR', brandPosX, brandPosY, 0);
+			drawLetters(font, 'PII', brandPosX, brandPosY, 0.07);
+			brandPosY -= step
+			drawLetters(font, `Name: ${person.profile.name}`, brandPosX + 0.25, brandPosY, 0.05);
+			brandPosY -= step
+			drawLetters(font, `Email: ${person.profile.email}`, brandPosX + 0.25, brandPosY, 0.05);
+			brandPosY -= step
+			drawLetters(font, `Phone: ${person.profile.phone}`, brandPosX + 0.25, brandPosY, 0.05);
 			brandPosY -= step
 			let addr = person.profile.address;
-			drawBrandCoProfile(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.05, brandPosY, 0);
-			brandPosY -= step
-			// PII section
-			drawBrandCoProfile(font, 'PII', brandPosX, brandPosY, 0)
+			drawLetters(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.25, brandPosY, 0.05);
 			brandPosY -= step
 			// Account history section
-			drawBrandCoProfile(font, 'Account History', brandPosX, brandPosY, 0)
+			drawLetters(font, 'Account History', brandPosX, brandPosY, 0.07)
 			brandPosY -= step
 			person.profile.accountHistory.forEach((item) => {
-				drawBrandCoProfile(font, `${item.name} : $${item.amount} : ${item.business}`, brandPosX + 0.05, brandPosY, 0);
+				drawLetters(font, `${item.name} : $${item.amount} : ${item.business}`, brandPosX + 0.25, brandPosY, 0.05);
 				brandPosY -= step
 			});
 			return '';
 		})
 	}
 
-	const drawConversantProfile = (font, text, x, y, z) => {
+	const drawLetters = (font, text, x, y, size) => {
 		var textGeo = new THREE.TextBufferGeometry(text, {
 			font: font,
-			size: 0.06,
+			size: size,
 			height: 0,
 			curveSegments: 12,
 			bevelEnabled: false,
@@ -295,25 +311,24 @@ function UserInterface(THREE, canvas) {
 		var mesh = new THREE.Mesh(textGeo, textMaterial);
 		mesh.position.x = x;
 		mesh.position.y = y;
-		mesh.position.z = z
 		adContainer.add(mesh);
 	}
 
-	const drawBrandCoProfile = (font, text, x, y, z) => {
-		var textGeo = new THREE.TextBufferGeometry(text, {
-			font: font,
-			size: 0.06,
-			height: 0.1,
-			curveSegments: 12,
-			bevelEnabled: false,
-		});
-		var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
-		var mesh = new THREE.Mesh(textGeo, textMaterial);
-		mesh.position.x = x;
-		mesh.position.y = y;
-		mesh.position.z = z
-		adContainer.add(mesh);
-	}
+	// const drawBrandCoProfile = (font, text, x, y, z) => {
+	// 	var textGeo = new THREE.TextBufferGeometry(text, {
+	// 		font: font,
+	// 		size: 0.06,
+	// 		height: 0.1,
+	// 		curveSegments: 12,
+	// 		bevelEnabled: false,
+	// 	});
+	// 	var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
+	// 	var mesh = new THREE.Mesh(textGeo, textMaterial);
+	// 	mesh.position.x = x;
+	// 	mesh.position.y = y;
+	// 	mesh.position.z = z
+	// 	adContainer.add(mesh);
+	// }
 
 	let cameraTweens = [];
 	let cameraTarget = { x: 0, y: 0, z: 0 };
