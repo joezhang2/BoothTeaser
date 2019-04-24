@@ -15,6 +15,8 @@ let appDims = {
 
 let startButton;
 
+const msTimeBetweenDetections = 500;
+
 let boxRotationDims = {
 	x: 0,
 	y: 0
@@ -93,10 +95,6 @@ function initializeApp () {
 						name !== 'name' 
 					) {
 						fakeWindow[name] = window[name];
-					} else if (name === 'visualViewport') {
-						console.log('want this?', name, JSON.parse(JSON.stringify(window[name])));
-					} else if (name === 'styleMedia') {
-						console.log('want this?', name, JSON.parse(JSON.stringify(window[name])));
 					}
 				}
 			} catch (ex){
@@ -162,7 +160,7 @@ function initializeApp () {
 							r();
 							break;
 						case 'noFacesFound':
-							console.log('returned no faces due to error');
+							console.log('Inactive app. Reset 3d camera position.');
 							visualsWorker.postMessage({
 								route: 'perspectiveUpdate',
 								x: 0, // left right position from center
@@ -171,19 +169,18 @@ function initializeApp () {
 							});
 							break;
 						case 'updateFacePosition':
-							console.log('returned face results. ready for new video frame');
 							visualsWorker.postMessage({
-								route: 'perspectiveUpdate',
-								x: boxRotationDims.x, // left right position from center
-								y: boxRotationDims.y, // up down position from center
-								z: 10 // distance from center
-							}); 
+								route: 'focusOnProfile',
+								vip: event.data.vip
+							});
 							break;
 						case 'readyForNewImage':
+							console.log('face detection ready soon');
 							// do a second between detections and see if the jank goes away
 							setTimeout(()=>{
+								console.log('face detection NOW!');
 								detectionAvailable = true;
-							}, 1000);
+							}, msTimeBetweenDetections);
 							break;
 						default:
 							console.log('not sure what to do here', event.data);
@@ -211,7 +208,7 @@ function initializeApp () {
 
 let vidCanvas,
 	vidCanvasCtx,
-	d0,d1,d2,d3,d4,d5,
+	d1,d2,d3,d4,
 	controlsData,
 	uiData,
 	controlsBitmap;
@@ -270,6 +267,7 @@ videoApp.startVideo().then((videoMetaData)=>{
 	startButton.addEventListener('click', ()=>{
 		initializeApp().then(()=>{
 			console.log('startup has completed');
+			/*
 			body.addEventListener('mousemove', (evt) => {
 				if (perspectiveUpdatePending) { return; }
 				perspectiveUpdatePending = setTimeout(()=>{
@@ -277,6 +275,7 @@ videoApp.startVideo().then((videoMetaData)=>{
 				}, 200); // delay 200ms between mousemove updates. updates happening too often can cause jank
 				updatePerspective(evt);
 			});
+			*/
 			requestAnimationFrame(raf);
 		});
 	});
@@ -376,7 +375,6 @@ function VideoApp(){
 			}).catch(err => reject(err));
 		});
 	};
-	
 	
 	const askForAudioVideoPermissions = () => {
 		return new Promise((resolve, reject)=>{

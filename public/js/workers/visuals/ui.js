@@ -318,7 +318,11 @@ function UserInterface(THREE, canvas) {
 		x: 500 / 1000,
 		y: Math.PI / 1000,
 		z: Math.PI / 1000
-	}
+	};
+
+	this.trackProfile = (vip) => {
+		console.log('vip received', vip);
+	};
 
 	this.updatePerspective = (x, y, z) => {
 		if (!animating) { return; }
