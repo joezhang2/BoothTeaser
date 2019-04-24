@@ -242,6 +242,7 @@ const raf = ()=>{
 		});
 	}
 
+	d4 = Date.now() - startTime;
 	// stats.end();
 	requestAnimationFrame(raf);
 }

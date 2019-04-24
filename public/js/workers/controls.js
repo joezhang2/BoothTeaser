@@ -22,6 +22,44 @@ class Document extends EventTarget {}
 
 let window, document = new Document();
 
+// More really bad practices to fix closed libraries. Here we overload setTimeout to replace it with a flawed promise implementation which sometimes cant be canceled.
+
+let callStackCount = 0;
+const maxiumCallStackSize = 750; // chrome specific 10402, of 774 in my tests
+
+setTimeout = function (timerHandler, timeout) {
+	let args = Array.prototype.slice.call(arguments);
+	args = args.length <3 ? [] : args.slice(2, args.length);
+	if (timeout === 0) {
+		if (callStackCount < maxiumCallStackSize) {
+			var cancelator = {cancelable: false };
+			callStackCount++;
+			new Promise(resolve=>{
+				resolve(timerHandler.apply(self, args));
+			});
+			return cancelator;
+		} else {
+			requestAnimationFrame(()=>{
+				timerHandler.apply(self, args);
+			});
+			callStackCount = 0;
+			return;
+		}
+	} 
+	const i = setInterval(()=>{
+		clearInterval(i);
+		timerHandler.apply(self, args);
+	}, timeout);
+	return i;
+};
+
+clearTimeout = (id)=>{ console.log(id); if(id && id.cancelable === false) { console.error('woops. cant cancel a 0ms timeout anymore! already ran it'); } else { clearInterval(id);} };
+
+// var x = setTimeout((x,y,z)=>{console.log(x,y,z);}, 0, 'hello', 'im', 'cassius');
+// var y = setTimeout((x,y,z)=>{console.log(x,y,z);}, 1000, 'hello', 'im', 'cassius');
+// clearTimeout(x);
+// clearTimeout(y);
+
 let faceTracking, gestureTracking;
 
 let runtimeInfo = {
@@ -128,7 +166,7 @@ onmessage = (event) => {
 			// void ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
 			workingContext.drawImage(event.data.bitmap, 0, 0, runtimeInfo.video.width, runtimeInfo.video.height);
 			event.data.bitmap.close();
-			
+
 			// console.log('detecting a face with this:', imageData, workingContext, workingCanvas);
 			faceTracking.detect(workingCanvas).then((allProfiles)=>{
 				// console.log('all profiles:', allProfiles);
