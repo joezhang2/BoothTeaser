@@ -51,6 +51,9 @@ onmessage = (event) => {
 			case 'perspectiveUpdate':
 				ui.updatePerspective(event.data.x,event.data.y,event.data.z);
 				break;
+			case 'focusOnProfile':
+				ui.trackProfile(event.data.vip);
+				break;
 			default:
 				postMessage({yo: 'had issues, dont even know what to do with this:' + event.data.route });
 		}

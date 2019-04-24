@@ -1,16 +1,23 @@
 
 // Namespace for face detection component
-function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
+function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight, fakeDataSource) {
 
 	let busy = false;
 	let ready = false;
 
-	const startTime = Date.now();
+	let updateCamera = false;
+	const renderLoop = ()=>{
+		if (updateCamera) {
+			updateCameraWithNewFacePosition();
+		}
+		requestAnimationFrame(renderLoop);
+	};
 
 	this.startFaceTracking = async ()=>{
 		return new Promise(async (resolve)=>{
 			const MODELS_PATH = '/js/models';
 
+			// const startTime = Date.now();
 			await faceapi.loadTinyFaceDetectorModel(MODELS_PATH);
 			// console.log('after loadTinyFaceDetectorModel', Date.now() - startTime);
 			await faceapi.loadFaceRecognitionModel(MODELS_PATH);
@@ -18,12 +25,13 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
 			await faceapi.loadFaceLandmarkTinyModel(MODELS_PATH);
 			// console.log('after loadFaceLandmarkTinyModel', Date.now() - startTime);	
 			ready = true;
+
+			renderLoop();
 			resolve();
 		});
 	};
 
 	let profileCache = [];
-	let updateCamera;
 	
 	const guid = ()=>{
 		function s4() {
@@ -48,32 +56,134 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
 		};
 	};
 	
+	const bogusGetter = () => 'o_O SaMpLe TeXt @_;';
+
+	// matches the faker.js lib's helper for createCard
+	let fakeGenerator;
+	fakeGenerator = {
+		name: {
+			findName: bogusGetter
+		},
+		internet: {
+			userName: bogusGetter,
+			email: bogusGetter,
+			domainName: bogusGetter
+		},
+		address: {
+			streetName: bogusGetter,
+			streetAddress: bogusGetter,
+			secondaryAddress: bogusGetter,
+			city: bogusGetter,
+			state: bogusGetter,
+			country: bogusGetter,
+			zipCode: bogusGetter,
+			latitude: bogusGetter,
+			longitude: bogusGetter
+		},
+		phone: {
+			phoneNumber: bogusGetter
+		},
+		company: {
+			companyName: bogusGetter,
+			catchPhrase: bogusGetter,
+			bs: bogusGetter
+		},
+		lorem: {
+			words: bogusGetter,
+			sentence: bogusGetter,
+			sentences: bogusGetter,
+			paragraph: bogusGetter
+
+		}
+	};
+	fakeGenerator.helpers = {};
+	fakeGenerator.helpers.createTransaction = bogusGetter;
+	fakeGenerator.helpers.createCard = ()=>{ return {
+		name: fakeGenerator.name.findName(),
+		username: fakeGenerator.internet.userName(),
+		email: fakeGenerator.internet.email(),
+		address: {
+			streetA: fakeGenerator.address.streetName(),
+			streetB: fakeGenerator.address.streetAddress(),
+			streetC: fakeGenerator.address.streetAddress(true),
+			streetD: fakeGenerator.address.secondaryAddress(),
+			city: fakeGenerator.address.city(),
+			state: fakeGenerator.address.state(),
+			country: fakeGenerator.address.country(),
+			zipcode: fakeGenerator.address.zipCode(),
+			geo: {
+				lat: fakeGenerator.address.latitude(),
+				lng: fakeGenerator.address.longitude()
+			}
+		},
+		phone: fakeGenerator.phone.phoneNumber(),
+		website: fakeGenerator.internet.domainName(),
+		company: {
+			name: fakeGenerator.company.companyName(),
+			catchPhrase: fakeGenerator.company.catchPhrase(),
+			bs: fakeGenerator.company.bs()
+		},
+		posts: [
+			{
+				words: fakeGenerator.lorem.words(),
+				sentence: fakeGenerator.lorem.sentence(),
+				sentences: fakeGenerator.lorem.sentences(),
+				paragraph: fakeGenerator.lorem.paragraph()
+			},
+			{
+				words: fakeGenerator.lorem.words(),
+				sentence: fakeGenerator.lorem.sentence(),
+				sentences: fakeGenerator.lorem.sentences(),
+				paragraph: fakeGenerator.lorem.paragraph()
+			},
+			{
+				words: fakeGenerator.lorem.words(),
+				sentence: fakeGenerator.lorem.sentence(),
+				sentences: fakeGenerator.lorem.sentences(),
+				paragraph: fakeGenerator.lorem.paragraph()
+			}
+		],
+		accountHistory: [fakeGenerator.helpers.createTransaction(), fakeGenerator.helpers.createTransaction(), fakeGenerator.helpers.createTransaction()]
+	}};
+
+	const fakeDS = fakeDataSource || fakeGenerator;
+
+	const generateFakeProfile = ()=>{
+		try {
+			return fakeDS.helpers.createCard();
+		} catch (ex) {
+			return fakeGenerator.helpers.createCard();
+		}
+	};
+
 	const createProfileCacheEntry = (box, landmarks) => {
-		profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
+
+		profileCache.push(createPerson(true, generateFakeProfile(), box, box.area, Date.now(), landmarks));
 	
 		// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-		if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
+		updateCamera = true;
 	
 		return profileCache[profileCache.length-1].uuid;
 	};
 	
 	
-	const updateProfileCacheEntry = (uuid, box, active, landmarks) => {
+	const updateProfileCacheEntry = (uuid, box, landmarks) => {
 		const index = profileCache.findIndex(person => person.uuid === uuid);
 		if (index > -1) {
 			const person = profileCache[index];
-			person.active = active;
+			person.active = true;
 			person.boundary = box;
 			person.timestamp = Date.now();
 			person.priority = box.area;
 			person.landmarks = landmarks;
+			console.log('now active', uuid);
 			if (person.idleTimeout) { clearTimeout(person.idleTimeout); person.idleTimeout = null; }
 		} else {
 			console.error(uuid, 'was not found in list on updated');
 		}
 	
 		// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-		if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
+		updateCamera = true;
 	
 		return uuid;
 	};
@@ -81,26 +191,29 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
 	const deactivateProfileCacheEntry = uuid => {
 		const index = profileCache.findIndex(person => person.uuid === uuid);
 		if (index > -1) {
-			const person = profileCache[index];
+			let person = profileCache[index];
 			if (!person.idleTimeout) {
 				// if a person disappears from view for 1 second, mark them as inactive
 				person.idleTimeout = setTimeout(() => {
 					person.active = false;
-				}, 1000);
+					console.log('inactive for 2 seconds:', uuid);
+				}, 2000);
 			}
+			console.log('not in view:', uuid);
 		} else {
 			console.error(uuid, 'was not found in list on deactivate');
 		}
 	
 		// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-		if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
+		updateCamera = true;
 	};
 	
 	let idleCameraTimeout;
 
 	const updateCameraWithNewFacePosition = () => {
+		console.log('UPDATE CAMERA WITH NEW FACE POSITION');
 		// clear update delegates if any are pending
-		if(updateCamera) { clearTimeout(updateCamera); updateCamera = null; }
+		updateCamera = false;
 	
 		let faces = profileCache;
 		
@@ -119,18 +232,23 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
 		if (!vip) {
 			if (!idleCameraTimeout) {
 				idleCameraTimeout = setTimeout(() => {
+					idleCameraTimeout = null;
+					console.log('!!!!!!!!!!!!!!!!!!!!!');
+					console.log('APP INACTIVE FOR 10 SECONDS, RESET CAMERA TO 0,0,0');
+					console.log('!!!!!!!!!!!!!!!!!!!!!');
 					profileFocusUpdateCallback();
-				}, 10000);
+				}, 8000); // 8 + 2 user idle seconds = 10 app seconds idle
 			}
 		} else {
 			if (idleCameraTimeout) { clearTimeout(idleCameraTimeout); idleCameraTimeout = null; }
+			console.log('this person is in view', vip);
 			profileFocusUpdateCallback(vip);
 		}
 	};
 	
 	let labeledDescriptors = [];
 	this.detect = videoCanvas => {
-		return new Promise(resolve=>{
+		return new Promise((resolve,reject)=>{
 			if (busy || !ready) {
 				// console.log('Requested detection, but models have not loaded yet.');
 				resolve();
@@ -164,7 +282,7 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
 								// console.log('creating new user entry', uuid);
 								labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(uuid, [detections[i].descriptor]));
 							} else {
-								uuid = updateProfileCacheEntry(m.label, detections[i].detection.box, true, detections[i].landmarks);
+								uuid = updateProfileCacheEntry(m.label, detections[i].detection.box, detections[i].landmarks);
 								// console.log('Updated user entry', uuid);
 							}
 							return uuid;
@@ -191,7 +309,7 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight) {
 					let activePersons = [];
 					labeledDescriptors.forEach(descriptor => {
 						activePersons = activePersons.concat(profileCache.filter(person => {
-							if (descriptor.label === person.uuid && person.active) {
+							if (descriptor.label === person.uuid && person.active && !person.idleTimeout) {
 								return true;
 							}
 						}));

@@ -25,35 +25,43 @@ let window, document = new Document();
 // More really bad practices to fix closed libraries. Here we overload setTimeout to replace it with a flawed promise implementation which sometimes cant be canceled.
 
 let callStackCount = 0;
-const maxiumCallStackSize = 750; // chrome specific 10402, of 774 in my tests
+const maxiumCallStackSize = 500; // chrome specific 10402, of 774 in my tests
+
+const fakeCancel = { cancelable: false };
 
 setTimeout = function (timerHandler, timeout) {
 	let args = Array.prototype.slice.call(arguments);
 	args = args.length <3 ? [] : args.slice(2, args.length);
 	if (timeout === 0) {
+		// try a promise implementation, but if the callstack is too deep, fallback to raf for a frame
 		if (callStackCount < maxiumCallStackSize) {
-			var cancelator = {cancelable: false };
 			callStackCount++;
-			new Promise(resolve=>{
-				resolve(timerHandler.apply(self, args));
-			});
-			return cancelator;
+			try {
+				new Promise(resolve=>{
+					resolve(timerHandler.apply(self, args));
+				});
+				return fakeCancel;
+			} catch (ex) {
+				console.log('Call stack size limit hit. Swallow the error and continue with RAF.');
+			}
 		} else {
-			requestAnimationFrame(()=>{
-				timerHandler.apply(self, args);
-			});
 			callStackCount = 0;
-			return;
 		}
-	} 
-	const i = setInterval(()=>{
-		clearInterval(i);
-		timerHandler.apply(self, args);
-	}, timeout);
-	return i;
+		requestAnimationFrame(()=>{
+			timerHandler.apply(self, args);
+		});
+		return fakeCancel;
+	} else {
+		// if there is a delay supplied to the timeout, use a timer style function instead of the immediate promise resolution
+		const i = setInterval(()=>{
+			clearInterval(i);
+			timerHandler.apply(self, args);
+		}, timeout);
+		return i;
+	}
 };
 
-clearTimeout = (id)=>{ console.log(id); if(id && id.cancelable === false) { console.error('woops. cant cancel a 0ms timeout anymore! already ran it'); } else { clearInterval(id);} };
+clearTimeout = (id)=>{ if(id && id.cancelable === false) { console.error('cant cancel a timeout that has already run'); } else { console.log('clearing timeout:', id); clearInterval(id);} };
 
 // var x = setTimeout((x,y,z)=>{console.log(x,y,z);}, 0, 'hello', 'im', 'cassius');
 // var y = setTimeout((x,y,z)=>{console.log(x,y,z);}, 1000, 'hello', 'im', 'cassius');
@@ -138,6 +146,7 @@ onmessage = (event) => {
 			workingContext = workingCanvas.getContext('2d');
 			faceTracking = new FaceTracking(vip=>{
 				if (vip){
+					console.log('New VIP!', vip.uuid);
 					postMessage({route: 'updateFacePosition', vip});
 				} else {
 					postMessage({route: 'noFacesFound'});
