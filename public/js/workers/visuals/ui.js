@@ -208,7 +208,6 @@ function UserInterface(THREE, canvas) {
 		});
 	};
 
-
 	var textBlock;
 	var adContainer = new THREE.Group();
 	// this is where all the profile layout stuff needs to happen
@@ -259,24 +258,22 @@ function UserInterface(THREE, canvas) {
 			drawLetters(font, '_VS_', -0.25, profilePosY, 0.09);
 
 			profilePosY -= step;
-			// GDPR section
+			// Profile section
 			drawLetters(font, 'Profile', profilePosX, profilePosY, 0.07);
 			profilePosY -= step
-			// Conversant attributes
+			// Conversant attributes placeholder
 			person.profile.accountHistory.forEach((item) => {
 				drawLetters(font, `${item.name}`, profilePosX  + 0.25, profilePosY, 0.05);
 				profilePosY -= step;
 			});
-
-
  			drawLetters(font, 'Opted Out ' + isOptedOut, profilePosX,  parentMesh.geometry.boundingBox.min.y + 0.25, 0.09);
 
-
+			// Brand section
 			let brandPosX = .25;
 			let brandPosY = parentMesh.geometry.boundingBox.max.y - 0.5;
 			drawLetters(font, 'Brand Co.', 3.2, brandPosY, 0.09);
 			brandPosY -= step
-			// GDPR section
+			// PII section
 			drawLetters(font, 'PII', brandPosX, brandPosY, 0.07);
 			brandPosY -= step
 			drawLetters(font, `Name: ${person.profile.name}`, brandPosX + 0.25, brandPosY, 0.05);
@@ -313,22 +310,6 @@ function UserInterface(THREE, canvas) {
 		mesh.position.y = y;
 		adContainer.add(mesh);
 	}
-
-	// const drawBrandCoProfile = (font, text, x, y, z) => {
-	// 	var textGeo = new THREE.TextBufferGeometry(text, {
-	// 		font: font,
-	// 		size: 0.06,
-	// 		height: 0.1,
-	// 		curveSegments: 12,
-	// 		bevelEnabled: false,
-	// 	});
-	// 	var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
-	// 	var mesh = new THREE.Mesh(textGeo, textMaterial);
-	// 	mesh.position.x = x;
-	// 	mesh.position.y = y;
-	// 	mesh.position.z = z
-	// 	adContainer.add(mesh);
-	// }
 
 	let cameraTweens = [];
 	let cameraTarget = { x: 0, y: 0, z: 0 };
