@@ -163,17 +163,27 @@ function initializeApp () {
 							break;
 						case 'noFacesFound':
 							console.log('returned no faces due to error');
-							detectionAvailable = true;
+							visualsWorker.postMessage({
+								route: 'perspectiveUpdate',
+								x: 0, // left right position from center
+								y: 0, // up down position from center
+								z: 10 // distance from center
+							});
 							break;
 						case 'updateFacePosition':
 							console.log('returned face results. ready for new video frame');
-							detectionAvailable = true;
 							visualsWorker.postMessage({
 								route: 'perspectiveUpdate',
 								x: boxRotationDims.x, // left right position from center
 								y: boxRotationDims.y, // up down position from center
 								z: 10 // distance from center
 							});
+							break;
+						case 'readyForNewImage':
+							// do a second between detections and see if the jank goes away
+							setTimeout(()=>{
+								detectionAvailable = true;
+							}, 1000);
 							break;
 						default:
 							console.log('not sure what to do here', event.data);

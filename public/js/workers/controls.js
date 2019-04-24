@@ -92,18 +92,21 @@ onmessage = (event) => {
 			importScripts(
 				'/js/libs/faker.js',
 				'/js/libs/face-api.js',
-				'/js/workers/controls/face-tracking.js',
-				'/js/workers/controls/gesture-tracking.js'
+				'/js/workers/controls/face-tracking.js'
 			);
 	
 			runtimeInfo = event.data.runtimeInfo;
 			workingCanvas = new Canvas(runtimeInfo.video.width, runtimeInfo.video.height);
 			workingContext = workingCanvas.getContext('2d');
-			faceTracking = new FaceTracking(runtimeInfo.video.width, runtimeInfo.video.height);
-			gestureTracking = new GestureTracking();
+			faceTracking = new FaceTracking(vip=>{
+				if (vip){
+					postMessage({route: 'updateFacePosition', vip});
+				} else {
+					postMessage({route: 'noFacesFound'});
+				}
+			}, runtimeInfo.video.width, runtimeInfo.video.height);
 
 			faceTracking.startFaceTracking().then(()=>{
-				console.log('Are the models loaded?');
 				postMessage({route: 'initialized'});
 			});
 			break;
@@ -120,18 +123,13 @@ onmessage = (event) => {
 			// ctx.putImageData(imageData, dx, dy, dirtyX, dirtyY, dirtyWidth, dirtyHeight)
 			workingContext.putImageData(imageData, 0, 0, 0, 0, runtimeInfo.video.width, runtimeInfo.video.height);
 
-			console.log('detecting a face with this:', imageData, workingContext, workingCanvas);
-			faceTracking.detect(workingCanvas).then((faceDims)=>{
-				if (faceDims.length > 0){
-					console.log('Found faces:', faceDims);
-					postMessage({route: 'updateFacePosition', dims:{ x:0, y:0, z:0, width:100, height: 100} });
-				} else {
-					console.log('no faces:', faceDims);
-					postMessage({route: 'updateFacePosition', dims:{ x:0, y:0, z:0, width:100, height: 100} });
-				}
-			}).catch(()=>{
-				console.log('hit an error, couldnt find a face');
-				postMessage({route: 'noFacesFound' });
+			// console.log('detecting a face with this:', imageData, workingContext, workingCanvas);
+			faceTracking.detect(workingCanvas).then((allProfiles)=>{
+				// console.log('all profiles:', allProfiles);
+				postMessage({route: 'readyForNewImage'});
+			}).catch(err=>{
+				console.warn('detection exited with an error:', err);
+				postMessage({route: 'readyForNewImage'}); // Maybe we continue?
 			});
 			break;
 		default:
