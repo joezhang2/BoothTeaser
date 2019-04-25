@@ -2,6 +2,16 @@
 // Namespace
 function UserInterface(THREE, canvas, videoDims, appDims) {
 
+	// const bgColor = 0xFFFFFF;
+	// const conversantFontColor = 0x000066;
+	// const brandcoFontColor = 0x660000;
+	// const nuetralFontColor = 0x000000;
+
+	const bgColor = 0x000000;
+	const conversantFontColor = 0x0000FF;
+	const brandcoFontColor = 0xFF0000;
+	const nuetralFontColor = 0xFFFFFF;
+
 	// Browser driver support specifics
 	let context;
 
@@ -33,13 +43,18 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		height: 0
 	};
 
+	const monitorDims = {
+		width: 1440,
+		height: 796
+	};
+
 	const adContainerDims = {
-		width: 8,
-		height: 4
+		width: 10 * (monitorDims.width / monitorDims.height),
+		height: 30 * (monitorDims.height / monitorDims.width)
 	};
 
 	const faker = window.faker;
-	const stepY = 0.5;
+
 	// current state of rotation animation
 	let angle = 0;
 
@@ -132,7 +147,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 			//		scene.matrixAutoUpdate = false;
 
-			const fogColor = new THREE.Color(0x000000);
+			const fogColor = new THREE.Color(bgColor);
 			scene.background = fogColor;
 			scene.fog = new THREE.Fog(fogColor, 20, 65);
 
@@ -214,100 +229,134 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 		const bgMesh = new THREE.Mesh(
 			new THREE.PlaneBufferGeometry(adContainerDims.width, adContainerDims.height, 1, 1),
-			new THREE.MeshPhysicalMaterial({ // this should probably be basic
-				color: new THREE.Color(0x2277FF),
+			new THREE.MeshBasicMaterial({ // this should probably be basic
+				color: new THREE.Color(0xAAAAAA),
 				transparent: true,
-				opacity: 0.2,
-				metalness: 1,
-				roughness: 0.5,
-				reflectivity: 1,
-				clearCoat: 1,
-				clearCoatRoughness: 0.5,
+				opacity: 0.5,
 				side: THREE.FrontSide
 			})
 		);
 
-		const shadowMesh = new THREE.Mesh(
-			new THREE.PlaneBufferGeometry(5, 4, 1, 1),
-			new THREE.ShadowMaterial({ // this should probably be basic
-				opacity: 0.9,
-				color: new THREE.Color(0x000000)
-			})
-		);
-		shadowMesh.position.z = 0.2; // depth
-		shadowMesh.receiveShadow = true;
-
-
-		adContainer.add(shadowMesh);
 		adContainer.add(bgMesh);
 		await text(bgMesh);
 		scene.add(adContainer);
 	};
 
-	const step = 0.25;
 	let isOptedOut = 'No';
+
 	const text = async (parentMesh) => {
 	
+		const bottomPadding = 0;
+		const fontSize = {
+			small: 3,
+			medium: 5,
+			large: 10
+		};
+
+		function TextBlock(container, parentMesh, defaultFont, defaultColor){
+			const thisBlock = this;
+			// keep track of what you added so you can remove it easily
+			let textMeshes = [];
+			let verticalPosition = parentMesh.geometry.boundingBox.max.y;
+			let horizontalPosition = 0;
+			console.log('Starting text block at x,y', horizontalPosition, verticalPosition);
+	
+			this.addLine = (text, options, position, rotation) => {
+				position = position || {};
+				rotation = rotation || {};
+				const style = {
+					position: {
+						x: position.x || horizontalPosition,
+						y: position.y || verticalPosition,
+						z: position.z || 0
+					},
+					rotation: {
+						x: rotation.x || 0,
+						y: rotation.y || 0,
+						z: rotation.z || 0
+					},
+					font: options.font || defaultFont,
+					size: options.size || fontSize.small,
+					color: options.color || defaultColor || nuetralFontColor
+				};
+		
+				const textGeo = new THREE.TextBufferGeometry(text, {
+					font: style.font,
+					size: 1,
+					height: 0, // ? what is this?
+					curveSegments: 12,
+					bevelEnabled: false
+				});
+		
+				const textMaterial = new THREE.MeshBasicMaterial({ color: style.color });
+				const mesh = new THREE.Mesh(textGeo, textMaterial);
+		
+				mesh.position.x = style.position.x;
+				mesh.position.y = style.position.y;
+				mesh.position.z = style.position.z;
+
+				console.log(mesh.position);
+				mesh.rotation.x = style.rotation.x;
+				mesh.rotation.y = style.rotation.y;
+				mesh.rotation.z = style.rotation.z;
+
+				mesh.scale = new THREE.Vector3(options.size, options.size, options.size);
+
+				textMeshes.push(mesh);
+				container.add(mesh);
+
+				verticalPosition -= (options.size + bottomPadding);
+
+				return thisBlock;
+			};
+		}
+
+		// thought we already loaded all the fonts? sure. ok. lets do it again.
 		return loadFonts().then(font => {
+			
 			parentMesh.geometry.computeBoundingBox();
 
-			let profilePosX = parentMesh.geometry.boundingBox.min.x + 0.25;
-			let profilePosY = parentMesh.geometry.boundingBox.max.y - 0.5;
-			drawLetters(font, 'Conversant', profilePosX, profilePosY, 0.09);
-			drawLetters(font, '_VS_', -0.25, profilePosY, 0.09);
+			bounds = parentMesh.geometry.boundingBox;
 
-			profilePosY -= step;
-			// Profile section
-			drawLetters(font, 'Profile', profilePosX, profilePosY, 0.07);
-			profilePosY -= step
-			// Conversant attributes placeholder
+			let cnvr = new TextBlock(adContainer, parentMesh, font, conversantFontColor, bounds.min.x, bounds.min.y);
+			cnvr.addLine('Conversant', { size: fontSize.large })
+				.addLine('Profile', { size: fontSize.large });
 			person.profile.accountHistory.forEach((item) => {
-				drawLetters(font, `${item.name}`, profilePosX  + 0.25, profilePosY, 0.05);
-				profilePosY -= step;
+				cnvr.addLine(`${item.name}`, { size: fontSize.small });
 			});
- 			drawLetters(font, 'Opted Out ' + isOptedOut, profilePosX,  parentMesh.geometry.boundingBox.min.y + 0.25, 0.09);
+			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, {y: bounds.max.y});
 
-			// Brand section
-			let brandPosX = .25;
-			let brandPosY = parentMesh.geometry.boundingBox.max.y - 0.5;
-			drawLetters(font, 'Brand Co.', 3.2, brandPosY, 0.09);
-			brandPosY -= step
-			// PII section
-			drawLetters(font, 'PII', brandPosX, brandPosY, 0.07);
-			brandPosY -= step
-			drawLetters(font, `Name: ${person.profile.name}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			drawLetters(font, `Email: ${person.profile.email}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			drawLetters(font, `Phone: ${person.profile.phone}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			let addr = person.profile.address;
-			drawLetters(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.25, brandPosY, 0.05);
-			brandPosY -= step
-			// Account history section
-			drawLetters(font, 'Account History', brandPosX, brandPosY, 0.07)
-			brandPosY -= step
+
+			let vs = new TextBlock(adContainer, parentMesh, font, nuetralFontColor, 0, bounds.min.y);
+			vs.addLine('vs', { size: fontSize.large });
+
+			// tired. hacking this in to see what happens
+			const addr = {
+				streetB: 'meh',
+				city: 'meh',
+				county: 'meh',
+				zipcode: 'meh'
+			};
+
+			let brandco = new TextBlock(adContainer, parentMesh, font, brandcoFontColor, 0, bounds.min.y);
+			brandco.addLine('Brand Co.', { size: fontSize.large })
+				.addLine('PII', { size: fontSize.large })
+				.addLine(`Name: ${person.profile.name}`, { size: fontSize.medium })
+				.addLine(`Email: ${person.profile.email}`, { size: fontSize.medium })
+				.addLine(`Phone: ${person.profile.phone}`, { size: fontSize.medium })
+				.addLine(`Address:`, { size: fontSize.medium })
+				.addLine(`${addr.streetB}`, { size: fontSize.small })
+				.addLine(`${addr.city}`, { size: fontSize.small })
+				.addLine(`${addr.country} ${addr.zipcode}`, { size: fontSize.small })
+				.addLine(`${addr.zipcode}`, { size: fontSize.small })
+				.addLine('Account History', { size: fontSize.large });
+
 			person.profile.accountHistory.forEach((item) => {
-				drawLetters(font, `${item.name} : $${item.amount} : ${item.business}`, brandPosX + 0.25, brandPosY, 0.05);
-				brandPosY -= step
+				brandco.addLine(`${item.name} : $${item.amount} : ${item.business}`, { size: fontSize.small });
 			});
+
 			return '';
 		})
-	}
-
-	const drawLetters = (font, text, x, y, size) => {
-		const textGeo = new THREE.TextBufferGeometry(text, {
-			font: font,
-			size: size,
-			height: 0,
-			curveSegments: 12,
-			bevelEnabled: false,
-		});
-		const textMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
-		const mesh = new THREE.Mesh(textGeo, textMaterial);
-		mesh.position.x = x;
-		mesh.position.y = y;
-		adContainer.add(mesh);
 	}
 
 	let cameraTweens = [];
@@ -437,8 +486,8 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		adContainer.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * -0.001;
 
 		adContainer.position.x = camera.position.x * 1.03;
-		adContainer.position.y = camera.position.y * 0.9;
-		adContainer.position.z = camera.position.z * 0.9;
+		adContainer.position.y = camera.position.y * 0.5;
+		adContainer.position.z = camera.position.z * 0.5;
 		// */
 
 		light.rotation.x = camera.rotation.x;
