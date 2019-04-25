@@ -1,6 +1,6 @@
 
 // Namespace
-function UserInterface(THREE, canvas) {
+function UserInterface(THREE, canvas, videoDims, appDims) {
 
 	// Browser driver support specifics
 	let context;
@@ -36,12 +36,14 @@ function UserInterface(THREE, canvas) {
 	const adContainerDims = {
 		width: 8,
 		height: 4
-	}
+	};
 
 	const faker = window.faker;
 	const stepY = 0.5;
 	// current state of rotation animation
 	let angle = 0;
+
+	const initialFov = 50;
 
 	const cameraHoverDistance = 75;
 
@@ -67,8 +69,6 @@ function UserInterface(THREE, canvas) {
 		return person;
 		// return profileCache[profileCache.length-1].uuid;
 	};
-
-
 
 	let person = createProfileCacheEntry();
 	// handy function for converting degrees to radians
@@ -122,12 +122,12 @@ function UserInterface(THREE, canvas) {
 		};
 	};
 
-	this.start3d = (appWidth, appHeight) => {
+	this.start3d = () => {
 		let startTime = Date.now();
 
 		return new Promise(resolve => {
 
-			const aspect = appWidth / appHeight;
+			const aspect = appDims.width / appDims.height;
 			scene = new THREE.Scene();
 
 			//		scene.matrixAutoUpdate = false;
@@ -151,7 +151,7 @@ function UserInterface(THREE, canvas) {
 				antialias: true
 			});
 
-			renderer.setSize(appWidth, appHeight);
+			renderer.setSize(appDims.width, appDims.height);
 
 			// positioning a light above the camera
 			light = new THREE.PointLight(0xFFFFFF, 1);
@@ -164,12 +164,12 @@ function UserInterface(THREE, canvas) {
 			scene.add(light);
 			// scene.updateMatrix();
 
-			renderer.setSize(appWidth, appHeight);
-			camera.aspect = appWidth / appHeight;
+			renderer.setSize(appDims.width, appDims.height);
+			camera.aspect = appDims.width / appDims.height;
 			camera.updateProjectionMatrix();
 
-			pageCenterDims.width = window.innerWidth / 2;
-			pageCenterDims.height = appHeight / 2;
+			pageCenterDims.width = appDims.width / 2;
+			pageCenterDims.height = appDims.height / 2;
 
 			resolve();
 		}).then(() => {
@@ -208,7 +208,6 @@ function UserInterface(THREE, canvas) {
 		});
 	};
 
-	var textBlock;
 	var adContainer = new THREE.Group();
 	// this is where all the profile layout stuff needs to happen
 	const drawAdContainer = async () => {
@@ -232,7 +231,7 @@ function UserInterface(THREE, canvas) {
 			new THREE.PlaneBufferGeometry(5, 4, 1, 1),
 			new THREE.ShadowMaterial({ // this should probably be basic
 				opacity: 0.9,
-				color: new THREE.Color(0x000000),
+				color: new THREE.Color(0x000000)
 			})
 		);
 		shadowMesh.position.z = 0.2; // depth
@@ -297,15 +296,15 @@ function UserInterface(THREE, canvas) {
 	}
 
 	const drawLetters = (font, text, x, y, size) => {
-		var textGeo = new THREE.TextBufferGeometry(text, {
+		const textGeo = new THREE.TextBufferGeometry(text, {
 			font: font,
 			size: size,
 			height: 0,
 			curveSegments: 12,
 			bevelEnabled: false,
 		});
-		var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
-		var mesh = new THREE.Mesh(textGeo, textMaterial);
+		const textMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+		const mesh = new THREE.Mesh(textGeo, textMaterial);
 		mesh.position.x = x;
 		mesh.position.y = y;
 		adContainer.add(mesh);
@@ -320,28 +319,79 @@ function UserInterface(THREE, canvas) {
 		z: Math.PI / 1000
 	};
 
-	this.trackProfile = (vip) => {
-		console.log('vip received', vip);
+	const fovCalc = new FieldOfViewCalculator({
+			x: 0,
+			y: 0,
+			width: videoDims.width/2,
+			height: videoDims.height/2
+		},
+		videoDims.width,
+		videoDims.height,
+		{fov: initialFov}
+	);
+
+	const calculateCameraPositionFromViewerPerspective = vip => {
+		
+		//	2D math
+		//	|--------------------------------------------------|	x max = video width
+		//	|---------------------------|							x center = video width/2
+		//	|														x origin = 0
+		//	|								   .____|___.
+		//	|----------------------------------| ( 0_0) |			x face pos = face.x + (face.width/2) = face center
+		//	|								   +----|---+
+		//								|-----------|				x delta from center = face pos - (video width/2)
+		//															delta from center = (face pos - (video width/2))/(video width/2)
+
+		//
+		//	3D math
+		//	|--------------------------------------------------|	x max = visible bounds/2
+		//	|---------------------------|							x center = 0
+		//	|														x origin = (visible bounds/2) * -1
+		//
+		//															delta between 2D and 3D = visible bounds / video width
+		//															x relative camera position = dim delta * x delta from center
+
+		// Center point before - center point after = distance;
+		const xFacePos2D = vip.boundary.x + (vip.boundary.width/2);
+		const xDeltaFromCenter = xFacePos2D - (videoDims.width/2);
+		const deltaBetweenHorizontalDims = visibleBounds.width / videoDims.width;
+		const xRelativeCameraPos = deltaBetweenHorizontalDims * xDeltaFromCenter;
+		const xTargetAdjusted = xRelativeCameraPos * 0.35; // only allow it to be half the actual distance from origin
+
+		const yFacePos2D = vip.boundary.y + (vip.boundary.height/2);
+		const yDeltaFromCenter = yFacePos2D - (videoDims.height/2);
+		const deltaBetweenVerticalDims = visibleBounds.height / videoDims.height;
+		const yRelativeCameraPos = deltaBetweenVerticalDims * yDeltaFromCenter;
+		const yTargetAdjusted = yRelativeCameraPos * 0.5; // only allow it to be half the actual distance from origin
+
+		console.log({xFacePos2D,xDeltaFromCenter,deltaBetweenHorizontalDims,xRelativeCameraPos,xTargetAdjusted});
+		console.log({yFacePos2D,yDeltaFromCenter,deltaBetweenVerticalDims,yRelativeCameraPos,yTargetAdjusted});
+		return {
+			x: xTargetAdjusted,
+			y: yTargetAdjusted,
+			z: 10,
+			fov: 50
+		};
 	};
 
-	this.updatePerspective = (x, y, z) => {
+	this.updatePerspective = (dims) => {
 		if (!animating) { return; }
-		cameraTarget.x = x;
-		cameraTarget.y = y;
-		cameraTarget.z = z;
+		cameraTarget.x = dims.x;
+		cameraTarget.y = dims.y;
+		cameraTarget.z = dims.z;
 
 		// Calculate duration using expected distance traveled over time. 
 		// Math.abs(Point A - Point B) = actual distance
 		// expected distance / expected time in s = expected rate of travel per s
 		// actual distance * expected rate = actual time
-		const xDuration = Math.abs(x - camera.position.x) * rateOfTravel.x
-		const yDuration = Math.abs(y - camera.rotation.y) * rateOfTravel.y
+		const xDuration = Math.abs(cameraTarget.x - camera.position.x) * rateOfTravel.x
+		// const yDuration = Math.abs(cameraTarget.y - camera.rotation.y) * rateOfTravel.y
 
 		if (cameraTweens.length) {
 			cameraTweens.pop().kill();
-			cameraTweens.pop().kill();
+			// cameraTweens.pop().kill();
 		}
-
+		console.log('moving camera from',camera.position, 'to', cameraTarget);
 		cameraTweens.push(TweenMax.to(camera.position, xDuration, {
 			x: cameraTarget.x,
 			ease: Power1.easeOut,
@@ -350,15 +400,22 @@ function UserInterface(THREE, canvas) {
 			}
 		}));
 
-		cameraTweens.push(TweenMax.to(camera.rotation, yDuration, {
-			y: cameraTarget.y,
-			ease: Power1.easeOut,
-			onComplete: () => {
-				console.log('finished tween', camera.rotation.y)
-			}
-		}));
+		// cameraTweens.push(TweenMax.to(camera.rotation, yDuration, {
+		// 	y: cameraTarget.y,
+		// 	ease: Power1.easeOut,
+		// 	onComplete: () => {
+		// 		console.log('finished tween', camera.rotation.y)
+		// 	}
+		// }));
 	};
 
+	this.trackProfile = (vip) => {
+		console.log('vip received', vip);
+		const perspectiveDims = calculateCameraPositionFromViewerPerspective(vip);
+		const headtrackrDims = fovCalc.track(vip.boundary);
+		console.warn('perspective updates:', perspectiveDims, headtrackrDims);
+		this.updatePerspective(perspectiveDims);
+	};
 
 	// This is stuff that could happen at any interval driven by any animation loop (tweenmax for instance, or just a timeout, or raf)
 	const render = () => {
