@@ -151,7 +151,7 @@ onmessage = (event) => {
 				} else {
 					postMessage({route: 'noFacesFound'});
 				}
-			}, runtimeInfo.video.width, runtimeInfo.video.height);
+			}, runtimeInfo.video.width, runtimeInfo.video.height, faker);
 
 			faceTracking.startFaceTracking().then(()=>{
 				postMessage({route: 'initialized'});

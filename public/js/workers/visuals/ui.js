@@ -242,16 +242,16 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			var geometry = new THREE.Geometry();
 			s.calculateDistances();
 			//s.reticulate( { distancePerStep: .1 });
-			s.reticulate( { steps: 500 } );
-			 var geometry = new THREE.Geometry();
-		
-			for( var j = 0; j < s.lPoints.length - 1; j++ ) {
-				geometry.vertices.push( s.lPoints[ j ].clone() );
+			s.reticulate({ steps: 500 });
+			var geometry = new THREE.Geometry();
+
+			for (var j = 0; j < s.lPoints.length - 1; j++) {
+				geometry.vertices.push(s.lPoints[j].clone());
 			}
-		
+
 			return geometry;
 		}
-		
+
 		var g = new MeshLine();
 		g.setGeometry( createCurve(), function( p ) { return 1 * Maf.parabola( p, 1 )} );
 
@@ -278,7 +278,8 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 	};
 
 	let isOptedOut = 'No';
-
+	// keep track of what you added so you can remove it easily
+	let textMeshes = [];
 	const text = async (person) => {
 		containerGeom.computeBoundingBox();
 		const bottomPadding = 0;
@@ -512,6 +513,10 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		if (prevPerson === null || vip.uuid !== prevPerson.uuid) {
 			prevPerson = vip;
 			console.log('Different PERSON');
+			textMeshes.forEach((i) => {
+				adContainer.remove(i)
+				scene.remove(i);
+			})
 			text(vip);
 		}
 		console.log(vip.uuid === prevPerson.uuid)
