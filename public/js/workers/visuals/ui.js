@@ -8,8 +8,10 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 	// const nuetralFontColor = 0x000000;
 
 	const bgColor = 0x000000;
-	const conversantFontColor = 0x0000FF;
-	const brandcoFontColor = 0xFF0000;
+	const conversantOutlineFontColor = 0x0000DD;
+	const brandcoOutlineFontColor = 0xDD0000;
+	const conversantFontColor = 0xFFFFFF;
+	const brandcoFontColor = 0xFFFFFF;
 	const nuetralFontColor = 0xFFFFFF;
 
 	// Browser driver support specifics
@@ -204,15 +206,19 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 	var adContainer = new THREE.Group();
 	let bgMesh;
+	let containerGeom;
+
 	// this is where all the profile layout stuff needs to happen
 	const drawAdContainer = async () => {
+
+		containerGeom = new THREE.PlaneBufferGeometry(adContainerDims.width, adContainerDims.height, 1, 1);
 
 		bgMesh = new THREE.Mesh(
 			new THREE.PlaneBufferGeometry(adContainerDims.width, adContainerDims.height, 1, 1),
 			new THREE.MeshBasicMaterial({ // this should probably be basic
 				color: new THREE.Color(0xAAAAAA),
 				transparent: true,
-				opacity: 0.5,
+				opacity: 0,
 				side: THREE.FrontSide
 			})
 		);
@@ -220,20 +226,17 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		function createCurve() {
 
 			var s = new THREE.ConstantSpline();
-			var rMin = 5;
-			var rMax = 10;
-			var origin = new THREE.Vector3( Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ) );
+			var rMin = 3;
+			// var origin = new THREE.Vector3( Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ) );
 		
 			s.inc = .001;
-			s.p0 = new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() );
+			s.p0 = new THREE.Vector3( 0, 0, 0 );
 			s.p0.set( 0, 0, 0 );
-			s.p1 = s.p0.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
-			s.p2 = s.p1.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
-			s.p3 = s.p2.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
-			s.p0.multiplyScalar( rMin + Math.random() * rMax );
-			s.p1.multiplyScalar( rMin + Math.random() * rMax );
-			s.p2.multiplyScalar( rMin + Math.random() * rMax );
-			s.p3.multiplyScalar( rMin + Math.random() * rMax );
+			s.p1 = s.p0.clone().add( new THREE.Vector3( 0, 10, 0 ) );
+			s.p2 = s.p1.clone().add( new THREE.Vector3( 0, 20, 0 ) );
+			s.p0.multiplyScalar( rMin );
+			s.p1.multiplyScalar( rMin );
+			s.p2.multiplyScalar( rMin );
 		
 			s.calculate();
 			var geometry = new THREE.Geometry();
@@ -251,42 +254,33 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		
 		var g = new MeshLine();
 		g.setGeometry( createCurve(), function( p ) { return 1 * Maf.parabola( p, 1 )} );
-		
-
-		// var loader = new THREE.TextureLoader();
-		// loader.load( 'assets/stroke.png', function( texture ) {
-		// 	strokeTexture = texture;
-		// 	init()
-		// } );
 
 		var lineMat = new MeshLineMaterial({
 			color: new THREE.Color( conversantFontColor ),
-			// opacity: 1,//params.strokes ? .5 : 1,
-			dashArray: new THREE.Vector2( 10, 5 ),
 			resolution: new THREE.Vector2( appDims.width, appDims.height ),
 			sizeAttenuation: 1,
-			lineWidth: 10,
+			lineWidth: 0.5,
 			near: camera.near,
 			far: camera.far,
 			depthWrite: false,
 			depthTest: true,
-			// alphaTest: .5,
-			// transparent: true,
 			side: THREE.DoubleSide
 		});
 
 		var lineMesh = new THREE.Mesh( g.geometry, lineMat );
+		lineMesh.position.y = -20;
 
-		adContainer.add(bgMesh);
-		adContainer.add(lineMesh);
+		// adContainer.scale.set(new THREE.Vector3(0.8,0.8,0.8));
+//		adContainer.add(bgMesh);
+		// adContainer.add(lineMesh);
 		// await text();
-		// scene.add(adContainer);
+		scene.add(adContainer);
 	};
 
 	let isOptedOut = 'No';
 
 	const text = async (person) => {
-		bgMesh.geometry.computeBoundingBox();
+		containerGeom.computeBoundingBox();
 		const bottomPadding = 0;
 		const borderPadding = 2;
 		const fontSize = {
@@ -301,12 +295,12 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			item: 3
 		}
 		const indentProfile = {
-			title: bgMesh.geometry.boundingBox.min.x + indent.title,
-			subTitle: bgMesh.geometry.boundingBox.min.x + indent.subTitle,
-			item: bgMesh.geometry.boundingBox.min.x + indent.item
+			title: containerGeom.boundingBox.min.x + indent.title,
+			subTitle: containerGeom.boundingBox.min.x + indent.subTitle,
+			item: containerGeom.boundingBox.min.x + indent.item
 		}
 		const indentBrandCo = {
-			title: bgMesh.geometry.boundingBox.max.x - 8,
+			title: containerGeom.boundingBox.max.x - 8,
 			subTitle: indent.subTitle,
 			item: indent.item
 		}
@@ -315,7 +309,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			const thisBlock = this;
 			// keep track of what you added so you can remove it easily
 			let textMeshes = [];
-			let verticalPosition = bgMesh.geometry.boundingBox.max.y - borderPadding;
+			let verticalPosition = containerGeom.boundingBox.max.y - borderPadding;
 			let horizontalPosition = 0;
 
 			this.addLine = (text, options, position, rotation) => {
@@ -374,9 +368,9 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		// thought we already loaded all the fonts? sure. ok. lets do it again.
 		return loadFonts().then(font => {
 
-			// bgMesh.geometry.computeBoundingBox();
+			// containerGeom.computeBoundingBox();
 
-			bounds = bgMesh.geometry.boundingBox;
+			bounds = containerGeom.boundingBox;
 
 			let cnvr = new TextBlock(adContainer, font, conversantFontColor, bounds.min.x, bounds.min.y);
 			cnvr.addLine('Conversant', { size: fontSize.large }, { x: indentProfile.title })
@@ -384,31 +378,24 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			person.profile.accountHistory.forEach((item) => {
 				cnvr.addLine(`${item.name}`, { size: fontSize.small }, { x: indentProfile.item });
 			});
-			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.min.y + borderPadding/2, x: indentProfile.title });
+			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.min.y + borderPadding / 2, x: indentProfile.title });
 
 
 			let vs = new TextBlock(adContainer, font, nuetralFontColor);
 			vs.addLine('vs', { size: fontSize.large });
 
-			// tired. hacking this in to see what happens
-			const addr = {
-				streetB: 'meh',
-				city: 'meh',
-				county: 'meh',
-				zipcode: 'meh'
-			};
 			let brandCoX = bounds.max.x;
 			let brandco = new TextBlock(adContainer, font, brandcoFontColor);
 			brandco.addLine('Brand Co.', { size: fontSize.large }, { x: indentBrandCo.title })
 				.addLine('PII', { size: fontSize.large }, { x: indentBrandCo.subTitle })
-				.addLine(`Name: ${person.profile.name}`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`Email: ${person.profile.email}`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`Phone: ${person.profile.phone}`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`Address:`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`${addr.streetB}`, { size: fontSize.small }, { x: indentBrandCo.item })
-				.addLine(`${addr.city}`, { size: fontSize.small }, { x: indentBrandCo.item })
-				.addLine(`${addr.country} ${addr.zipcode}`, { size: fontSize.small }, { x: indentBrandCo.item })
-				.addLine(`${addr.zipcode}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Name: ${person.profile.name}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Email: ${person.profile.email}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Phone: ${person.profile.phone}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Address:`, { size: fontSize.medium }, { x: indentBrandCo.subTitle })
+				.addLine(`${person.profile.address.streetB}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`${person.profile.address.city}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`${person.profile.address.country}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`${person.profile.address.zipcode}`, { size: fontSize.small }, { x: indentBrandCo.item })
 				.addLine('Account History', { size: fontSize.medium }, { x: indentBrandCo.subTitle });
 
 			person.profile.accountHistory.forEach((item) => {
@@ -562,6 +549,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		light.position.x = camera.position.x * 5;
 		light.position.y = camera.position.y * 1.5;
 		light.position.z = camera.position.z * 1.5;
+
 
 		// Scenes 
 		// scene.matrixWorldNeedsUpdate = false;
@@ -718,20 +706,20 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 	const createPoints = () => {
 
 		// this works for non-rasterized fonts. Should still work on rasterized fonts
-		const Xonfig = {
+		const config = {
 			maxWidth: 90,
 			xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
 			numWidthIncrement: 30,
-			maxRadius: 45,
+			maxRadius: 35,
 			minRadius: 20,
 			numRadiusIncrements: 20
 		};
 
-		const config = { // this is the dev config because it starts up faster, so your refreshes arent slow
+		const Xonfig = { // this is the dev config because it starts up faster, so your refreshes arent slow
 			maxWidth: 90,
 			xPosition: (90 / 2) * -1, // maxwidth / 2 * -1
 			numWidthIncrement: 10,
-			maxRadius: 45,
+			maxRadius: 40,
 			minRadius: 20,
 			numRadiusIncrements: 10
 		};
@@ -787,9 +775,9 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 		return new Promise(resolve => {
 			spaceWorkOut(points, (pos) => {
-				if (pos.x < midway - 15) {
+				if (pos.x < midway - 3) {
 					rotY = 2;
-				} else if (pos.x > midway + 15) {
+				} else if (pos.x > midway + 3) {
 					rotY = 0;
 				} else {
 					rotY = 1;
