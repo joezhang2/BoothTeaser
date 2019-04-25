@@ -1,6 +1,16 @@
 
 // Namespace
-function UserInterface(THREE, canvas) {
+function UserInterface(THREE, canvas, videoDims, appDims) {
+
+	// const bgColor = 0xFFFFFF;
+	// const conversantFontColor = 0x000066;
+	// const brandcoFontColor = 0x660000;
+	// const nuetralFontColor = 0x000000;
+
+	const bgColor = 0x000000;
+	const conversantFontColor = 0x0000FF;
+	const brandcoFontColor = 0xFF0000;
+	const nuetralFontColor = 0xFFFFFF;
 
 	// Browser driver support specifics
 	let context;
@@ -33,44 +43,25 @@ function UserInterface(THREE, canvas) {
 		height: 0
 	};
 
-	const adContainerDims = {
-		width: 8,
-		height: 4
-	}
+	const monitorDims = {
+		width: 1440,
+		height: 796
+	};
 
-	const faker = window.faker;
-	const stepY = 0.5;
+	const adContainerDims = {
+		width: window.innerWidth/30,
+		height: window.innerHeight/50
+		// width: 10 * (monitorDims.width / monitorDims.height),
+		// height: 30 * (monitorDims.height / monitorDims.width)
+	};
+
 	// current state of rotation animation
 	let angle = 0;
 
+	const initialFov = 50;
+
 	const cameraHoverDistance = 75;
 
-	const createPerson = (active, profile, boundary, priority, timestamp, landmarks) => {
-		return {
-			uuid: THREE.Math.generateUUID(),
-			active,
-			profile,
-			boundary,
-			priority,
-			timestamp,
-			landmarks,
-			idleTimeout: null
-		};
-	};
-
-	// const createProfileCacheEntry = () => {
-	// 	// profileCache.push(createPerson(true, faker.helpers.createCard(), box, box.area, Date.now(), landmarks));
-	// 	let person = createPerson(true, faker.helpers.createCard(), Date.now())
-	// 	// use a timeout as a delegate to handle updates on next thread run, and if one is already scheduled, do nothing.
-	// 	// if(!updateCamera){ updateCamera = setTimeout(updateCameraWithNewFacePosition, 0); }
-	// 	console.log(person)
-	// 	return person;
-	// 	// return profileCache[profileCache.length-1].uuid;
-	// };
-
-
-
-	// let person = createProfileCacheEntry();
 	// handy function for converting degrees to radians
 	const rads = (degrees) => {
 		return THREE.Math.degToRad(degrees); //  * Math.PI / 180;
@@ -122,17 +113,17 @@ function UserInterface(THREE, canvas) {
 		};
 	};
 
-	this.start3d = (appWidth, appHeight) => {
+	this.start3d = () => {
 		let startTime = Date.now();
 
 		return new Promise(resolve => {
 
-			const aspect = appWidth / appHeight;
+			const aspect = appDims.width / appDims.height;
 			scene = new THREE.Scene();
 
 			//		scene.matrixAutoUpdate = false;
 
-			const fogColor = new THREE.Color(0x000000);
+			const fogColor = new THREE.Color(bgColor);
 			scene.background = fogColor;
 			scene.fog = new THREE.Fog(fogColor, 20, 65);
 
@@ -151,7 +142,7 @@ function UserInterface(THREE, canvas) {
 				antialias: true
 			});
 
-			renderer.setSize(appWidth, appHeight);
+			renderer.setSize(appDims.width, appDims.height);
 
 			// positioning a light above the camera
 			light = new THREE.PointLight(0xFFFFFF, 1);
@@ -164,12 +155,12 @@ function UserInterface(THREE, canvas) {
 			scene.add(light);
 			// scene.updateMatrix();
 
-			renderer.setSize(appWidth, appHeight);
-			camera.aspect = appWidth / appHeight;
+			renderer.setSize(appDims.width, appDims.height);
+			camera.aspect = appDims.width / appDims.height;
 			camera.updateProjectionMatrix();
 
-			pageCenterDims.width = window.innerWidth / 2;
-			pageCenterDims.height = appHeight / 2;
+			pageCenterDims.width = appDims.width / 2;
+			pageCenterDims.height = appDims.height / 2;
 
 			resolve();
 		}).then(() => {
@@ -197,9 +188,10 @@ function UserInterface(THREE, canvas) {
 
 				// Ad container is required by render function
 				drawAdContainer();
-				text().then((adContainer) =>{
-					scene.add(adContainer);
-				})
+				// text().then((adContainer) => {
+				// 	scene.add(adContainer);
+				// });
+				scene.add(adContainer);
 				render();
 				resolve();
 			});
@@ -217,111 +209,133 @@ function UserInterface(THREE, canvas) {
 
 		bgMesh = new THREE.Mesh(
 			new THREE.PlaneBufferGeometry(adContainerDims.width, adContainerDims.height, 1, 1),
-			new THREE.MeshPhysicalMaterial({ // this should probably be basic
-				color: new THREE.Color(0x2277FF),
+			new THREE.MeshBasicMaterial({ // this should probably be basic
+				color: new THREE.Color(0xAAAAAA),
 				transparent: true,
-				opacity: 0.2,
-				metalness: 1,
-				roughness: 0.5,
-				reflectivity: 1,
-				clearCoat: 1,
-				clearCoatRoughness: 0.5,
+				opacity: 0.5,
 				side: THREE.FrontSide
 			})
 		);
 
-		const shadowMesh = new THREE.Mesh(
-			new THREE.PlaneBufferGeometry(5, 4, 1, 1),
-			new THREE.ShadowMaterial({ // this should probably be basic
-				opacity: 0.9,
-				color: new THREE.Color(0x000000),
-			})
-		);
-		shadowMesh.position.z = 0.2; // depth
-		shadowMesh.receiveShadow = true;
-
-
-		adContainer.add(shadowMesh);
 		adContainer.add(bgMesh);
 		// await text();
 		// scene.add(adContainer);
 	};
 
-	const step = 0.25;
 	let isOptedOut = 'No';
-	
-	const text = async (person) => {
 
+	const text = async (person) => {
+		console.log('8*********************TEXT')
+		const bottomPadding = 0;
+		const fontSize = {
+			small: 3,
+			medium: 5,
+			large: 10
+		};
+
+		function TextBlock(container, defaultFont, defaultColor) {
+			const thisBlock = this;
+			// keep track of what you added so you can remove it easily
+			let textMeshes = [];
+			let verticalPosition = bgMesh.geometry.boundingBox.max.y;
+			let horizontalPosition = 0;
+			console.log('Starting text block at x,y', horizontalPosition, verticalPosition);
+
+			this.addLine = (text, options, position, rotation) => {
+				position = position || {};
+				rotation = rotation || {};
+				const style = {
+					position: {
+						x: position.x || horizontalPosition,
+						y: position.y || verticalPosition,
+						z: position.z || 0
+					},
+					rotation: {
+						x: rotation.x || 0,
+						y: rotation.y || 0,
+						z: rotation.z || 0
+					},
+					font: options.font || defaultFont,
+					size: options.size || fontSize.small,
+					color: options.color || defaultColor || nuetralFontColor
+				};
+
+				const textGeo = new THREE.TextBufferGeometry(text, {
+					font: style.font,
+					size: 1,
+					height: 0, // ? what is this?
+					curveSegments: 12,
+					bevelEnabled: false
+				});
+
+				const textMaterial = new THREE.MeshBasicMaterial({ color: style.color });
+				const mesh = new THREE.Mesh(textGeo, textMaterial);
+
+				mesh.position.x = style.position.x;
+				mesh.position.y = style.position.y;
+				mesh.position.z = style.position.z;
+
+				console.log(mesh.position);
+				mesh.rotation.x = style.rotation.x;
+				mesh.rotation.y = style.rotation.y;
+				mesh.rotation.z = style.rotation.z;
+
+				mesh.scale = new THREE.Vector3(options.size, options.size, options.size);
+
+				textMeshes.push(mesh);
+				container.add(mesh);
+
+				verticalPosition -= (options.size + bottomPadding);
+
+				return thisBlock;
+			};
+		}
+
+		// thought we already loaded all the fonts? sure. ok. lets do it again.
 		return loadFonts().then(font => {
+
 			bgMesh.geometry.computeBoundingBox();
 
-			// position profile
-			let profilePosX = bgMesh.geometry.boundingBox.min.x + 0.25;
-			let profilePosY = bgMesh.geometry.boundingBox.max.y - 0.5;
+			bounds = bgMesh.geometry.boundingBox;
 
-			//position brand
-			let brandPosX = .25;
-			let brandPosY = bgMesh.geometry.boundingBox.max.y - 0.5;
+			let cnvr = new TextBlock(adContainer, font, conversantFontColor, bounds.min.x, bounds.min.y);
+			cnvr.addLine('Conversant', { size: fontSize.large })
+				.addLine('Profile', { size: fontSize.large });
+			person.profile.accountHistory.forEach((item) => {
+				cnvr.addLine(`${item.name}`, { size: fontSize.small });
+			});
+			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.max.y });
 
-			// Headers
-			drawLetters(font, 'Conversant', profilePosX, profilePosY, 0.09);
-			drawLetters(font, '_VS_', -0.25, profilePosY, 0.09);
-			drawLetters(font, 'Brand Co.', 3.2, brandPosY, 0.09);
-			console.log(person)
-			// Only show info if person is available
-			if (person) {
-				profilePosY -= step;
-				// Profile section
-				drawLetters(font, 'Profile', profilePosX, profilePosY, 0.07);
-				profilePosY -= step
-				// Conversant attributes placeholder
-				console.log(person.profile.accountHistory)
-				person.profile.accountHistory.forEach((item) => {
-					drawLetters(font, `${item}`, profilePosX + 0.25, profilePosY, 0.05);
-					profilePosY -= step;
-				});
-				drawLetters(font, 'Opted Out ' + isOptedOut, profilePosX, bgMesh.geometry.boundingBox.min.y + 0.25, 0.09);
 
-				// Brand section
+			let vs = new TextBlock(adContainer, font, nuetralFontColor, 0, bounds.min.y);
+			vs.addLine('vs', { size: fontSize.large });
 
-				brandPosY -= step
-				// PII section
-				drawLetters(font, 'PII', brandPosX, brandPosY, 0.07);
-				brandPosY -= step
-				drawLetters(font, `Name: ${person.profile.name}`, brandPosX + 0.25, brandPosY, 0.05);
-				brandPosY -= step
-				drawLetters(font, `Email: ${person.profile.email}`, brandPosX + 0.25, brandPosY, 0.05);
-				brandPosY -= step
-				drawLetters(font, `Phone: ${person.profile.phone}`, brandPosX + 0.25, brandPosY, 0.05);
-				brandPosY -= step
-				let addr = person.profile.address;
-				drawLetters(font, `Address: ${addr.streetB} ${addr.city}, ${addr.country} ${addr.zipcode}`, brandPosX + 0.25, brandPosY, 0.05);
-				brandPosY -= step
-				// Account history section
-				drawLetters(font, 'Account History', brandPosX, brandPosY, 0.07)
-				brandPosY -= step
-				person.profile.accountHistory.forEach((item) => {
-					drawLetters(font, `${item}`, brandPosX + 0.25, brandPosY, 0.05);
-					brandPosY -= step
-				});
-			}
-			return adContainer;
-		})
-	}
+			// tired. hacking this in to see what happens
+			const addr = {
+				streetB: 'meh',
+				city: 'meh',
+				county: 'meh',
+				zipcode: 'meh'
+			};
 
-	const drawLetters = (font, text, x, y, size) => {
-		var textGeo = new THREE.TextBufferGeometry(text, {
-			font: font,
-			size: size,
-			height: 0,
-			curveSegments: 12,
-			bevelEnabled: false,
+			let brandco = new TextBlock(adContainer, font, brandcoFontColor, 0, bounds.min.y);
+			brandco.addLine('Brand Co.', { size: fontSize.large })
+				.addLine('PII', { size: fontSize.large })
+				.addLine(`Name: ${person.profile.name}`, { size: fontSize.medium })
+				.addLine(`Email: ${person.profile.email}`, { size: fontSize.medium })
+				.addLine(`Phone: ${person.profile.phone}`, { size: fontSize.medium })
+				.addLine(`Address:`, { size: fontSize.medium })
+				.addLine(`${addr.streetB}`, { size: fontSize.small })
+				.addLine(`${addr.city}`, { size: fontSize.small })
+				.addLine(`${addr.country} ${addr.zipcode}`, { size: fontSize.small })
+				.addLine(`${addr.zipcode}`, { size: fontSize.small })
+				.addLine('Account History', { size: fontSize.large });
+
+			person.profile.accountHistory.forEach((item) => {
+				brandco.addLine(`${item.name} : $${item.amount} : ${item.business}`, { size: fontSize.small });
+			});
+			return '';
 		});
-		var textMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, specular: 0xffffff });
-		var mesh = new THREE.Mesh(textGeo, textMaterial);
-		mesh.position.x = x;
-		mesh.position.y = y;
-		adContainer.add(mesh);
 	}
 
 	let cameraTweens = [];
@@ -332,36 +346,82 @@ function UserInterface(THREE, canvas) {
 		y: Math.PI / 1000,
 		z: Math.PI / 1000
 	};
-	let prevPerson = null;
-	this.trackProfile = (vip) => {
-		console.log('vip received', vip);
-		// Only update if new person
-		if (prevPerson === null || vip.uuid !== prevPerson.uuid) {
-			prevPerson = vip;
-			console.log('Different PERSON');
-			text(vip);
-		}
-		console.log(vip.uuid === prevPerson.uuid)
+	const fovCalc = new FieldOfViewCalculator({
+		x: 0,
+		y: 0,
+		width: videoDims.width/2,
+		height: videoDims.height/2
+	},
+	videoDims.width,
+	videoDims.height,
+	{fov: initialFov}
+);
+
+
+
+	const calculateCameraPositionFromViewerPerspective = vip => {
+
+		//	2D math
+		//	|--------------------------------------------------|	x max = video width
+		//	|---------------------------|							x center = video width/2
+		//	|														x origin = 0
+		//	|								   .____|___.
+		//	|----------------------------------| ( 0_0) |			x face pos = face.x + (face.width/2) = face center
+		//	|								   +----|---+
+		//								|-----------|				x delta from center = face pos - (video width/2)
+		//															delta from center = (face pos - (video width/2))/(video width/2)
+
+		//
+		//	3D math
+		//	|--------------------------------------------------|	x max = visible bounds/2
+		//	|---------------------------|							x center = 0
+		//	|														x origin = (visible bounds/2) * -1
+		//
+		//															delta between 2D and 3D = visible bounds / video width
+		//															x relative camera position = dim delta * x delta from center
+
+		// Center point before - center point after = distance;
+		const xFacePos2D = vip.boundary.x + (vip.boundary.width / 2);
+		const xDeltaFromCenter = xFacePos2D - (videoDims.width / 2);
+		const deltaBetweenHorizontalDims = visibleBounds.width / videoDims.width;
+		const xRelativeCameraPos = deltaBetweenHorizontalDims * xDeltaFromCenter;
+		const xTargetAdjusted = xRelativeCameraPos * 0.35; // only allow it to be half the actual distance from origin
+
+		const yFacePos2D = vip.boundary.y + (vip.boundary.height / 2);
+		const yDeltaFromCenter = yFacePos2D - (videoDims.height / 2);
+		const deltaBetweenVerticalDims = visibleBounds.height / videoDims.height;
+		const yRelativeCameraPos = deltaBetweenVerticalDims * yDeltaFromCenter;
+		const yTargetAdjusted = yRelativeCameraPos * 0.5; // only allow it to be half the actual distance from origin
+
+		console.log({ xFacePos2D, xDeltaFromCenter, deltaBetweenHorizontalDims, xRelativeCameraPos, xTargetAdjusted });
+		console.log({ yFacePos2D, yDeltaFromCenter, deltaBetweenVerticalDims, yRelativeCameraPos, yTargetAdjusted });
+		return {
+			x: xTargetAdjusted,
+			y: yTargetAdjusted,
+			z: 10,
+			fov: 50
+		};
 	};
 
-	this.updatePerspective = (x, y, z) => {
+	this.updatePerspective = (dims) => {
 		if (!animating) { return; }
-		cameraTarget.x = x;
-		cameraTarget.y = y;
-		cameraTarget.z = z;
+		cameraTarget.x = dims.x;
+		cameraTarget.y = dims.y;
+		cameraTarget.z = dims.z;
 
 		// Calculate duration using expected distance traveled over time. 
 		// Math.abs(Point A - Point B) = actual distance
 		// expected distance / expected time in s = expected rate of travel per s
 		// actual distance * expected rate = actual time
-		const xDuration = Math.abs(x - camera.position.x) * rateOfTravel.x
-		const yDuration = Math.abs(y - camera.rotation.y) * rateOfTravel.y
+		const xDuration = Math.abs(cameraTarget.x - camera.position.x) * rateOfTravel.x
+		// const yDuration = Math.abs(cameraTarget.y - camera.rotation.y) * rateOfTravel.y
 
 		if (cameraTweens.length) {
 			cameraTweens.pop().kill();
-			cameraTweens.pop().kill();
+			// cameraTweens.pop().kill();
 		}
 
+		console.log('moving camera from', camera.position, 'to', cameraTarget);
 		cameraTweens.push(TweenMax.to(camera.position, xDuration, {
 			x: cameraTarget.x,
 			ease: Power1.easeOut,
@@ -370,13 +430,27 @@ function UserInterface(THREE, canvas) {
 			}
 		}));
 
-		cameraTweens.push(TweenMax.to(camera.rotation, yDuration, {
-			y: cameraTarget.y,
-			ease: Power1.easeOut,
-			onComplete: () => {
-				console.log('finished tween', camera.rotation.y)
-			}
-		}));
+		// cameraTweens.push(TweenMax.to(camera.rotation, yDuration, {
+		// 	y: cameraTarget.y,
+		// 	ease: Power1.easeOut,
+		// 	onComplete: () => {
+		// 		console.log('finished tween', camera.rotation.y)
+		// 	}
+		// }));
+	};
+	let prevPerson = null;
+	this.trackProfile = (vip) => {
+		console.log('vip received', vip);
+		const perspectiveDims = calculateCameraPositionFromViewerPerspective(vip);
+		const headtrackrDims = fovCalc.track(vip.boundary);
+		console.warn('perspective updates:', perspectiveDims, headtrackrDims);
+		if (prevPerson === null || vip.uuid !== prevPerson.uuid) {
+			prevPerson = vip;
+			console.log('Different PERSON');
+			text(vip);
+		}
+		console.log(vip.uuid === prevPerson.uuid)
+		this.updatePerspective(perspectiveDims);
 	};
 
 
@@ -400,8 +474,8 @@ function UserInterface(THREE, canvas) {
 		adContainer.rotation.y = (cameraOriginDims.x + (boxRotationDims.x * -1)) * -0.001;
 
 		adContainer.position.x = camera.position.x * 1.03;
-		adContainer.position.y = camera.position.y * 0.9;
-		adContainer.position.z = camera.position.z * 0.9;
+		adContainer.position.y = camera.position.y * 0.5;
+		adContainer.position.z = camera.position.z * 0.5;
 		// */
 
 		light.rotation.x = camera.rotation.x;

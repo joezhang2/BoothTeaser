@@ -172,11 +172,35 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight, fak
 		if (index > -1) {
 			const person = profileCache[index];
 			person.active = true;
-			person.boundary = box;
+			person.boundary = {
+				x: box.x,
+				y: box.y,
+				width: box.width,
+				height: box.height,
+				top: box.top,
+				left: box.left,
+				bottom: box.bottom,
+				right: box.right,
+				area: box.area
+			};
 			person.timestamp = Date.now();
 			person.priority = box.area;
-			person.landmarks = landmarks;
-			console.log('now active', uuid);
+			person.landmarks = {
+				jawOutline: landmarks.getJawOutline(),
+				imageHeight: landmarks.imageHeight,
+				imageWidth: landmarks.imageWidth,
+				positions: landmarks.positions,
+				relativePositions: landmarks.relativePositions,
+				leftEye: landmarks.getLeftEye(),
+				leftEyeBrow: landmarks.getLeftEyeBrow(),
+				mouth: landmarks.getMouth(),
+				nose: landmarks.getNose(),
+				refPointsForAlignment: landmarks.getRefPointsForAlignment(),
+				rightEye: landmarks.getRightEye(),
+				rightEyeBrow: landmarks.getRightEyeBrow()
+			};
+
+			// console.log('now active', uuid);
 			if (person.idleTimeout) { clearTimeout(person.idleTimeout); person.idleTimeout = null; }
 		} else {
 			console.error(uuid, 'was not found in list on updated');
@@ -211,7 +235,7 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight, fak
 	let idleCameraTimeout;
 
 	const updateCameraWithNewFacePosition = () => {
-		console.log('UPDATE CAMERA WITH NEW FACE POSITION');
+		// console.log('UPDATE CAMERA WITH NEW FACE POSITION');
 		// clear update delegates if any are pending
 		updateCamera = false;
 	
@@ -241,7 +265,7 @@ function FaceTracking(profileFocusUpdateCallback, sourceWidth, sourceHeight, fak
 			}
 		} else {
 			if (idleCameraTimeout) { clearTimeout(idleCameraTimeout); idleCameraTimeout = null; }
-			console.log('this person is in view', vip);
+			// console.log('this person is in view', vip);
 			profileFocusUpdateCallback(vip);
 		}
 	};

@@ -42,7 +42,7 @@ setTimeout = function (timerHandler, timeout) {
 				});
 				return fakeCancel;
 			} catch (ex) {
-				console.log('Call stack size limit hit. Swallow the error and continue with RAF.');
+				console.warn('Call stack size limit hit. Swallow the error and continue with RAF.');
 			}
 		} else {
 			callStackCount = 0;
@@ -95,7 +95,7 @@ onmessage = (event) => {
 			}
 			window = Window = self;
 			localStorage = new Storage();
-			console.log('*faked* Window object for the worker', window);
+			// console.log('*faked* Window object for the worker', window);
 
 			for (let key in event.data.fakeDocument) {
 				if (document[key]) { continue; }
@@ -109,7 +109,7 @@ onmessage = (event) => {
 					document[key] = d;
 				}
 			}
-			console.log('*faked* Document object for the worker', document);
+			// console.log('*faked* Document object for the worker', document);
 
 			function createElement(element) {
 				// console.log('FAKE ELELEMT instance', createElement, 'type', createElement, '(', createElement.arguments, ')');
@@ -133,7 +133,7 @@ onmessage = (event) => {
 
 			document.createElement = createElement;
 			document.location = self.location;
-			console.log('*faked* Document object for the worker', document);
+			// console.log('*faked* Document object for the worker', document);
 		
 			importScripts(
 				'/js/libs/faker.js',
@@ -146,7 +146,7 @@ onmessage = (event) => {
 			workingContext = workingCanvas.getContext('2d');
 			faceTracking = new FaceTracking(vip=>{
 				if (vip){
-					console.log('New VIP!', vip.uuid);
+					// console.log('New VIP!', vip.uuid);
 					postMessage({route: 'updateFacePosition', vip});
 				} else {
 					postMessage({route: 'noFacesFound'});

@@ -1,8 +1,13 @@
 let window, document;
 
 let ui;
-// just to make it match the parent thread
+
 let appDims = {
+	width: 0,
+	height: 0
+};
+
+let videoDims = {
 	width: 0,
 	height: 0
 };
@@ -15,8 +20,8 @@ onmessage = (event) => {
 		window.location = self.location;
 
 		// just to make it match the parent thread
-		appDims.width = event.data.fakeWindow.innerWidth;
-		appDims.height = event.data.fakeWindow.innerHeight;
+		appDims = event.data.runtimeInfo.ui;
+		videoDims = event.data.runtimeInfo.video;
 
 		// Three.js tried to edit these values of canvas (which do not exist, or are not settable on OffscreenCanvas)
 		event.data.uiCanvas.style = {
@@ -35,6 +40,7 @@ onmessage = (event) => {
 		};
 	
 		importScripts(
+			'/js/libs/headposition.js',
 			'/js/libs/three.js',
 			'/js/libs/BufferGeometryUtils.js',
 		//	'/js/libs/GeometryUtils.js',
@@ -43,16 +49,18 @@ onmessage = (event) => {
 			'/js/libs/faker.js'
 		);
 
-		ui = new UserInterface(THREE, event.data.uiCanvas);
-		ui.start3d(appDims.width, appDims.height);
+		ui = new UserInterface(THREE, event.data.uiCanvas, videoDims, appDims);
+		ui.start3d();
 
 		postMessage({route: 'initialized'});
 	} else if (ui) {
 		switch (event.data.route) {
 			case 'perspectiveUpdate':
-				ui.updatePerspective(event.data.x,event.data.y,event.data.z);
+				console.log('manually setting perspective to', event.data);
+				ui.updatePerspective(event.data);
 				break;
 			case 'focusOnProfile':
+				// console.log('following', event.data.vip);
 				ui.trackProfile(event.data.vip);
 				break;
 			default:

@@ -155,12 +155,12 @@ function initializeApp () {
 				} else {
 					switch (event.data.route) {
 						case 'initialized':
-							console.log('initialized controls');
+							// console.log('initialized controls');
 							detectionAvailable = true;
 							r();
 							break;
 						case 'noFacesFound':
-							console.log('Inactive app. Reset 3d camera position.');
+							// console.log('Inactive app. Reset 3d camera position.');
 							visualsWorker.postMessage({
 								route: 'perspectiveUpdate',
 								x: 0, // left right position from center
@@ -175,10 +175,10 @@ function initializeApp () {
 							});
 							break;
 						case 'readyForNewImage':
-							console.log('face detection ready soon');
+							// console.log('face detection ready soon');
 							// do a second between detections and see if the jank goes away
 							setTimeout(()=>{
-								console.log('face detection NOW!');
+								// console.log('face detection NOW!');
 								detectionAvailable = true;
 							}, msTimeBetweenDetections);
 							break;
@@ -189,7 +189,7 @@ function initializeApp () {
 			};
 		}));
 
-		visualsWorker.postMessage({route:'init', fakeWindow, fakeDocument, uiCanvas}, [uiCanvas]); // window is copied, ui is "transfered" via 0 copy
+		visualsWorker.postMessage({route:'init', fakeWindow, fakeDocument, runtimeInfo, uiCanvas}, [uiCanvas]); // window is copied, ui is "transfered" via 0 copy
 		controlsWorker.postMessage({route:'init', fakeWindow, fakeDocument, runtimeInfo});
 		// make sure we don't do this more than once
 		startButton.removeEventListener('click', initializeApp);
@@ -235,7 +235,7 @@ const raf = ()=>{
 				bitmap: bitmap
 			}, [bitmap]); // "transfered"
 			d3 = Date.now() - startTime;
-			console.log('raf:', d1, d2, d3);
+			console.log('video capture:', d3);
 		});
 	}
 
