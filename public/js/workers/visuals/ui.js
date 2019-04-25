@@ -227,7 +227,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 	const text = async (person) => {
 		bgMesh.geometry.computeBoundingBox();
 		const bottomPadding = 0;
-		const borderPadding = 0.5;
+		const borderPadding = 2;
 		const fontSize = {
 			small: 0.3,
 			medium: 0.5,
@@ -236,26 +236,26 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 		const indent = {
 			title: 1,
-			subTitle: 3,
-			item: 6
+			subTitle: 2,
+			item: 3
 		}
 		const indentProfile = {
-			title: bgMesh.geometry.boundingBox.min.x + 1,
-			subTitle: bgMesh.geometry.boundingBox.min.x + 3,
-			item: bgMesh.geometry.boundingBox.min.x + 6
+			title: bgMesh.geometry.boundingBox.min.x + indent.title,
+			subTitle: bgMesh.geometry.boundingBox.min.x + indent.subTitle,
+			item: bgMesh.geometry.boundingBox.min.x + indent.item
 		}
 		const indentBrandCo = {
-			title: bgMesh.geometry.boundingBox.max.x - 2,
-			subTitle: 3,
-			item: 6
+			title: bgMesh.geometry.boundingBox.max.x - 8,
+			subTitle: indent.subTitle,
+			item: indent.item
 		}
 
 		function TextBlock(container, defaultFont, defaultColor) {
 			const thisBlock = this;
 			// keep track of what you added so you can remove it easily
 			let textMeshes = [];
-			let verticalPosition = bgMesh.geometry.boundingBox.max.y;
- 			let horizontalPosition = 0;
+			let verticalPosition = bgMesh.geometry.boundingBox.max.y - borderPadding;
+			let horizontalPosition = 0;
 
 			this.addLine = (text, options, position, rotation) => {
 				position = position || {};
@@ -263,7 +263,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 				let style = {
 					position: {
 						x: position.x || horizontalPosition,
-						y: position.y || verticalPosition ,
+						y: position.y || verticalPosition,
 						z: position.z || 0
 					},
 					rotation: {
@@ -287,7 +287,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 				const textMaterial = new THREE.MeshBasicMaterial({ color: style.color });
 				const mesh = new THREE.Mesh(textGeo, textMaterial);
 				mesh.geometry.computeBoundingBox();
-
+				
 				mesh.position.x = style.position.x;
 				mesh.position.y = style.position.y;
 				mesh.position.z = style.position.z;
@@ -319,14 +319,14 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 			let cnvr = new TextBlock(adContainer, font, conversantFontColor, bounds.min.x, bounds.min.y);
 			cnvr.addLine('Conversant', { size: fontSize.large }, { x: indentProfile.title })
-				.addLine('Profile', { size: fontSize.large }, { x: indentProfile.title });
+				.addLine('Profile', { size: fontSize.large }, { x: indentProfile.subTitle });
 			person.profile.accountHistory.forEach((item) => {
-				cnvr.addLine(`${item.name}`, { size: fontSize.small }, { x: indentProfile.subTitle });
+				cnvr.addLine(`${item.name}`, { size: fontSize.small }, { x: indentProfile.item });
 			});
-			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.min.y, x: indentProfile.title });
+			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.min.y + borderPadding/2, x: indentProfile.title });
 
 
-			let vs = new TextBlock(adContainer, font, nuetralFontColor, 0, bounds.min.y);
+			let vs = new TextBlock(adContainer, font, nuetralFontColor);
 			vs.addLine('vs', { size: fontSize.large });
 
 			// tired. hacking this in to see what happens
@@ -337,7 +337,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 				zipcode: 'meh'
 			};
 			let brandCoX = bounds.max.x;
-			let brandco = new TextBlock(adContainer, font, brandcoFontColor, 0, bounds.min.y);
+			let brandco = new TextBlock(adContainer, font, brandcoFontColor);
 			brandco.addLine('Brand Co.', { size: fontSize.large }, { x: indentBrandCo.title })
 				.addLine('PII', { size: fontSize.large }, { x: indentBrandCo.subTitle })
 				.addLine(`Name: ${person.profile.name}`, { size: fontSize.medium }, { x: indentBrandCo.item })
