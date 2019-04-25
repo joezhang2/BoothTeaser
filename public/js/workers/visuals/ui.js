@@ -348,7 +348,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 				const textMaterial = new THREE.MeshBasicMaterial({ color: style.color });
 				const mesh = new THREE.Mesh(textGeo, textMaterial);
 				mesh.geometry.computeBoundingBox();
-				
+
 				mesh.position.x = style.position.x;
 				mesh.position.y = style.position.y;
 				mesh.position.z = style.position.z;
@@ -751,7 +751,8 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 	const loadFonts = () => {
 		return new Promise(resolve => {
-			(new THREE.FontLoader()).load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', resolve);
+			(new THREE.FontLoader()).load('../../../fonts/gibson_semibold.json', resolve);
+			// (new THREE.FontLoader()).load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', resolve);
 		});
 	};
 
