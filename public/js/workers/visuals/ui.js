@@ -217,7 +217,68 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			})
 		);
 
+		function createCurve() {
+
+			var s = new THREE.ConstantSpline();
+			var rMin = 5;
+			var rMax = 10;
+			var origin = new THREE.Vector3( Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ) );
+		
+			s.inc = .001;
+			s.p0 = new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() );
+			s.p0.set( 0, 0, 0 );
+			s.p1 = s.p0.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
+			s.p2 = s.p1.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
+			s.p3 = s.p2.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
+			s.p0.multiplyScalar( rMin + Math.random() * rMax );
+			s.p1.multiplyScalar( rMin + Math.random() * rMax );
+			s.p2.multiplyScalar( rMin + Math.random() * rMax );
+			s.p3.multiplyScalar( rMin + Math.random() * rMax );
+		
+			s.calculate();
+			var geometry = new THREE.Geometry();
+			s.calculateDistances();
+			//s.reticulate( { distancePerStep: .1 });
+			s.reticulate( { steps: 500 } );
+			 var geometry = new THREE.Geometry();
+		
+			for( var j = 0; j < s.lPoints.length - 1; j++ ) {
+				geometry.vertices.push( s.lPoints[ j ].clone() );
+			}
+		
+			return geometry;
+		}
+		
+		var g = new MeshLine();
+		g.setGeometry( createCurve(), function( p ) { return 1 * Maf.parabola( p, 1 )} );
+		
+
+		// var loader = new THREE.TextureLoader();
+		// loader.load( 'assets/stroke.png', function( texture ) {
+		// 	strokeTexture = texture;
+		// 	init()
+		// } );
+
+		var lineMat = new MeshLineMaterial({
+			color: new THREE.Color( conversantFontColor ),
+			// opacity: 1,//params.strokes ? .5 : 1,
+			dashArray: new THREE.Vector2( 10, 5 ),
+			resolution: new THREE.Vector2( appDims.width, appDims.height ),
+			sizeAttenuation: 1,
+			lineWidth: 10,
+			near: camera.near,
+			far: camera.far,
+			depthWrite: false,
+			depthTest: true,
+			// alphaTest: .5,
+			// transparent: true,
+			side: THREE.DoubleSide
+		});
+
+		var lineMesh = new THREE.Mesh( g.geometry, lineMat );
+
 		adContainer.add(bgMesh);
+		adContainer.add(lineMesh);
 		// await text();
 		// scene.add(adContainer);
 	};
@@ -375,8 +436,6 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		videoDims.height,
 		{ fov: initialFov }
 	);
-
-
 
 	const calculateCameraPositionFromViewerPerspective = vip => {
 

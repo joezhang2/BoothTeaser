@@ -3,10 +3,21 @@
 <head>
 <style>
 * {
-	margin: 0;
+	margin:0;
+	padding:0;
+	border:0;
 	overflow: hidden;
 	-webkit-overflow-scrolling: auto;
 }
+#activeFace {
+	width: 640px;
+	height: 480px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-top: auto;
+	clip-path: circle(60px at center);
+}
+
 button {
 	background:#000;
 	color:#FFF;
@@ -15,7 +26,6 @@ button {
 </style>
 </head>
 <body>
-	<div class='main-container'></div>
 	<script src='/js/libs/stats.js'></script>
 	<script src='/js/app.js'></script>
 </body>

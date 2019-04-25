@@ -42,6 +42,9 @@ onmessage = (event) => {
 		importScripts(
 			'/js/libs/headposition.js',
 			'/js/libs/three.js',
+			'/js/libs/Maf.js',
+			'/js/libs/THREE.MeshLine.js',
+			'/js/libs/THREE.ConstantSpline.js',
 			'/js/libs/BufferGeometryUtils.js',
 		//	'/js/libs/GeometryUtils.js',
 			'/js/libs/TweenMax.js',
