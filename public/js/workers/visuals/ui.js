@@ -222,36 +222,36 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			var s = new THREE.ConstantSpline();
 			var rMin = 5;
 			var rMax = 10;
-			var origin = new THREE.Vector3( Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ), Maf.randomInRange( -rMin, rMin ) );
-		
+			var origin = new THREE.Vector3(Maf.randomInRange(-rMin, rMin), Maf.randomInRange(-rMin, rMin), Maf.randomInRange(-rMin, rMin));
+
 			s.inc = .001;
-			s.p0 = new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() );
-			s.p0.set( 0, 0, 0 );
-			s.p1 = s.p0.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
-			s.p2 = s.p1.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
-			s.p3 = s.p2.clone().add( new THREE.Vector3( .5 - Math.random(), .5 - Math.random(), .5 - Math.random() ) );
-			s.p0.multiplyScalar( rMin + Math.random() * rMax );
-			s.p1.multiplyScalar( rMin + Math.random() * rMax );
-			s.p2.multiplyScalar( rMin + Math.random() * rMax );
-			s.p3.multiplyScalar( rMin + Math.random() * rMax );
-		
+			s.p0 = new THREE.Vector3(.5 - Math.random(), .5 - Math.random(), .5 - Math.random());
+			s.p0.set(0, 0, 0);
+			s.p1 = s.p0.clone().add(new THREE.Vector3(.5 - Math.random(), .5 - Math.random(), .5 - Math.random()));
+			s.p2 = s.p1.clone().add(new THREE.Vector3(.5 - Math.random(), .5 - Math.random(), .5 - Math.random()));
+			s.p3 = s.p2.clone().add(new THREE.Vector3(.5 - Math.random(), .5 - Math.random(), .5 - Math.random()));
+			s.p0.multiplyScalar(rMin + Math.random() * rMax);
+			s.p1.multiplyScalar(rMin + Math.random() * rMax);
+			s.p2.multiplyScalar(rMin + Math.random() * rMax);
+			s.p3.multiplyScalar(rMin + Math.random() * rMax);
+
 			s.calculate();
 			var geometry = new THREE.Geometry();
 			s.calculateDistances();
 			//s.reticulate( { distancePerStep: .1 });
-			s.reticulate( { steps: 500 } );
-			 var geometry = new THREE.Geometry();
-		
-			for( var j = 0; j < s.lPoints.length - 1; j++ ) {
-				geometry.vertices.push( s.lPoints[ j ].clone() );
+			s.reticulate({ steps: 500 });
+			var geometry = new THREE.Geometry();
+
+			for (var j = 0; j < s.lPoints.length - 1; j++) {
+				geometry.vertices.push(s.lPoints[j].clone());
 			}
-		
+
 			return geometry;
 		}
-		
+
 		var g = new MeshLine();
-		g.setGeometry( createCurve(), function( p ) { return 1 * Maf.parabola( p, 1 )} );
-		
+		g.setGeometry(createCurve(), function (p) { return 1 * Maf.parabola(p, 1) });
+
 
 		// var loader = new THREE.TextureLoader();
 		// loader.load( 'assets/stroke.png', function( texture ) {
@@ -260,10 +260,10 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		// } );
 
 		var lineMat = new MeshLineMaterial({
-			color: new THREE.Color( conversantFontColor ),
+			color: new THREE.Color(conversantFontColor),
 			// opacity: 1,//params.strokes ? .5 : 1,
-			dashArray: new THREE.Vector2( 10, 5 ),
-			resolution: new THREE.Vector2( appDims.width, appDims.height ),
+			dashArray: new THREE.Vector2(10, 5),
+			resolution: new THREE.Vector2(appDims.width, appDims.height),
 			sizeAttenuation: 1,
 			lineWidth: 10,
 			near: camera.near,
@@ -275,7 +275,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			side: THREE.DoubleSide
 		});
 
-		var lineMesh = new THREE.Mesh( g.geometry, lineMat );
+		var lineMesh = new THREE.Mesh(g.geometry, lineMat);
 
 		adContainer.add(bgMesh);
 		adContainer.add(lineMesh);
@@ -284,8 +284,16 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 	};
 
 	let isOptedOut = 'No';
-
+	// keep track of what you added so you can remove it easily
+	let textMeshes = [];
 	const text = async (person) => {
+
+		// // Before drawing, remove any previous text meshes
+		// textMeshes.forEach((item) => {
+		// 	adContainer.remove(item);
+		// })
+
+
 		bgMesh.geometry.computeBoundingBox();
 		const bottomPadding = 0;
 		const borderPadding = 2;
@@ -313,8 +321,7 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 
 		function TextBlock(container, defaultFont, defaultColor) {
 			const thisBlock = this;
-			// keep track of what you added so you can remove it easily
-			let textMeshes = [];
+
 			let verticalPosition = bgMesh.geometry.boundingBox.max.y - borderPadding;
 			let horizontalPosition = 0;
 
@@ -384,31 +391,24 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 			person.profile.accountHistory.forEach((item) => {
 				cnvr.addLine(`${item.name}`, { size: fontSize.small }, { x: indentProfile.item });
 			});
-			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.min.y + borderPadding/2, x: indentProfile.title });
+			cnvr.addLine('Opted Out ' + isOptedOut, { size: fontSize.large }, { y: bounds.min.y + borderPadding / 2, x: indentProfile.title });
 
 
 			let vs = new TextBlock(adContainer, font, nuetralFontColor);
 			vs.addLine('vs', { size: fontSize.large });
 
-			// tired. hacking this in to see what happens
-			const addr = {
-				streetB: 'meh',
-				city: 'meh',
-				county: 'meh',
-				zipcode: 'meh'
-			};
 			let brandCoX = bounds.max.x;
 			let brandco = new TextBlock(adContainer, font, brandcoFontColor);
 			brandco.addLine('Brand Co.', { size: fontSize.large }, { x: indentBrandCo.title })
 				.addLine('PII', { size: fontSize.large }, { x: indentBrandCo.subTitle })
-				.addLine(`Name: ${person.profile.name}`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`Email: ${person.profile.email}`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`Phone: ${person.profile.phone}`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`Address:`, { size: fontSize.medium }, { x: indentBrandCo.item })
-				.addLine(`${addr.streetB}`, { size: fontSize.small }, { x: indentBrandCo.item })
-				.addLine(`${addr.city}`, { size: fontSize.small }, { x: indentBrandCo.item })
-				.addLine(`${addr.country} ${addr.zipcode}`, { size: fontSize.small }, { x: indentBrandCo.item })
-				.addLine(`${addr.zipcode}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Name: ${person.profile.name}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Email: ${person.profile.email}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Phone: ${person.profile.phone}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`Address:`, { size: fontSize.medium }, { x: indentBrandCo.subTitle })
+				.addLine(`${person.profile.address.streetB}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`${person.profile.address.city}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`${person.profile.address.country}`, { size: fontSize.small }, { x: indentBrandCo.item })
+				.addLine(`${person.profile.address.zipcode}`, { size: fontSize.small }, { x: indentBrandCo.item })
 				.addLine('Account History', { size: fontSize.medium }, { x: indentBrandCo.subTitle });
 
 			person.profile.accountHistory.forEach((item) => {
@@ -525,6 +525,10 @@ function UserInterface(THREE, canvas, videoDims, appDims) {
 		if (prevPerson === null || vip.uuid !== prevPerson.uuid) {
 			prevPerson = vip;
 			console.log('Different PERSON');
+			textMeshes.forEach((i) => {
+				adContainer.remove(i)
+				scene.remove(i);
+			})
 			text(vip);
 		}
 		console.log(vip.uuid === prevPerson.uuid)
